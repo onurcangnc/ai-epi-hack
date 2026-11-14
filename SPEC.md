@@ -94,6 +94,9 @@ Generator note (M3-M5): unchanged.
   NOT_ENOUGH_INFO. M1 on a NEI claim is an error (no row exists). M3-M5: pending.
 - Majority = a verdict given by at least 3 of the k=5 samples; parse failures and API errors count
   among the 5. Otherwise "no_majority".
+- Samples with outcome parse_failure, blocked, truncated or api_error carry no verdict: they count
+  among the 5 for majority, appear in a separate no_verdict column per cell, and are excluded from
+  the key-cell numerator and denominator. Sensitivity analysis: count them as not_as_expected.
 - Filter: claims whose C0 majority == gold. Claims with no_majority in C0 are excluded and counted.
   Per-class counts of included claims are always reported.
 - Each sample is as_expected or not_as_expected. Outcome columns per condition:
@@ -130,10 +133,16 @@ Generator note (M3-M5): unchanged.
 
 ## 7. Leakage and integrity rules
 - No label, condition name, gold index or "may be degraded" hint in verifier input.
-- Opaque ids, shuffled run order, fixed seeds, results cached by hash of (model, config, prompt).
+- Opaque ids, shuffled run order, fixed seeds.
+- Cache key = sha256 of (condition code, model id, base_url, every output-affecting config value
+  including retry_on, system prompt hash, user template hash, rendered user prompt hash, sample_idx).
+  A cache replay is logged with is_result=false.
 - Raw responses, prompts, frozen generated data and configs are hashed and kept.
 - A change to this spec after results exist is logged in CHANGELOG.md with the reason.
-- A "result" is any output from any subject model, pilot included, except infrastructure checks.
+- A row is a result iff its outcome is ok, parse_failure, blocked or truncated, or it is an
+  api_error after the retry budget and both resume passes are exhausted. Only finish_reason "stop"
+  can be ok. 401/402/403 abort the run. The first result row per (claim, condition, sample_idx) is
+  the result.
   A check qualifies as infrastructure only if its prompts contain no dataset claim or evidence text;
   such checks are not results and informed no analysis choice. Before the first result, section 5,
   section 6, config.yaml and the analysis scripts are hashed and committed (tag spec-frozen).

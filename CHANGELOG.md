@@ -4,6 +4,46 @@ Changes to `SPEC.md` are recorded here with their reason, per SPEC §7. The §3/
 changes below were made before any experiment result existed; the TASK A2 entry
 above is the first result and records that ordering.
 
+## 2026-11-14 — SPEC v1.3: cache key, result definition, no_verdict
+
+SPEC sections 6 and 7 amended after the callayer-v2 review. Reason: C0' replayed C0 from the
+cache under the old key; infrastructure failures, truncations and moderation blocks were not
+distinguishable results; no main-run result exists yet.
+
+SPEC SHA-256: `3df0490a586e0d402f03e0e43a1c5241ac4b1418e7bdf83226accddb6f5dcc9b`
+
+## 2026-11-14 — SPEC §6/§7 amended; TASK B2 findings 1-11 fixed
+
+**SPEC.** Applied with explicit human approval after the "do not edit SPEC.md" conflict was
+raised. §7: cache key = sha256 of (condition, model, base_url, output-affecting config including
+retry_on, system prompt hash, user template hash, rendered user prompt hash, sample_idx), and a
+cache replay is logged `is_result=false`. §7: a row is a result iff its outcome is ok,
+parse_failure, blocked or truncated, or an api_error after the retry budget and both resume
+passes; only finish_reason "stop" can be ok; 401/402/403 abort the run; the first result row per
+(claim, condition, sample_idx) is the result. §6: no-verdict samples count among the 5 for
+majority, get their own no_verdict column, are excluded from the key-cell numerator/denominator,
+and a sensitivity analysis counts them as not_as_expected.
+
+**Code.** Backend: AuthError for 401/402/403, Retry-After, http_status, response model,
+system_fingerprint, reasoning_tokens, Bearer redaction. Parser: duplicate keys, extra keys, deep
+nesting and int-digit limits rejected as parse_failure. Prompts: single-pass placeholder
+substitution; evidence sentences must be non-blank strings. Escaping: case/whitespace tag
+variants. Client: full cache key, disk cache with unique temp names and os.replace retries,
+per-key single-flight lock, raw re-parsed on every cache hit, 5 attempts (max_retries 4) with
+60 s-capped backoff honouring Retry-After, resume passes re-queueing only api_error,
+crash-resume, blocked/truncated outcomes, `is_result=false` cache replays, append-only logging,
+redaction in every logged string, and timestamp/http_status/reasoning_tokens/response_model/
+system_fingerprint/user_template_sha256/cache_key fields.
+
+**Config.** `max_retries` 2 → 4 (5 attempts); `cache.dir` moved to
+`C:/Users/rekal/AppData/Local/epistemics-eval/cache`, outside OneDrive.
+
+**Tests.** 172 passing, 36 of them in `tests/test_b2_findings.py`. Three legacy tests were updated
+to the new semantics (extra fields now rejected, length now truncated, cached finish_reason test
+uses stop). Deviation from the tests-first instruction: the rewrite and tests were developed
+together; the first post-implementation run failed 3 legacy tests plus 2 new-test assertion bugs,
+not the intended pre-fix list.
+
 ## 2026-11-14 — Stability descriptors declared before any main-run result
 
 **Declared.** Stability is reported per claim and condition as two descriptive quantities:
