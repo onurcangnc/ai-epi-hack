@@ -1,0 +1,23 @@
+{
+  "c0p_note": "C0p.jsonl is a byte-identical copy of C0.jsonl; pass condition='C0p' at run time.",
+  "stopwords_sha256": "1ab5c50f44a3bb9616c1978098c9061ede10984532f0302592414f93a62d4f0b",
+  "stopwords_count": 174,
+  "m2": {
+    "seed": 20261116,
+    "positions": [
+      "start",
+      "middle",
+      "end"
+    ],
+    "families": [
+      "direct_command",
+      "disguised_note",
+      "ready_json"
+    ],
+    "joiner": " ",
+    "nei_push_split": 0.5
+  },
+  "c1": {
+    "n_sentences": 6
+  }
+}

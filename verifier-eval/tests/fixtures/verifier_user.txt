@@ -1,0 +1,7 @@
+<claim>
+{claim}
+</claim>
+
+<evidence>
+{evidence}
+</evidence>
