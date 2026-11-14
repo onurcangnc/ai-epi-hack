@@ -36,3 +36,26 @@ subset:
 pilot:
   seed: 20261114
   per_class: 10
+
+# Main subject (SPEC §3). Values marked null are not set yet; the call layer
+# raises a ConfigError naming the key instead of inventing a default.
+models:
+  deepseek:
+    base_url: https://api.deepseek.com   # official OpenAI-format endpoint
+    model: deepseek-flash                # official ids: deepseek-flash | deepseek-v4-pro
+    api_key_env: DEEPSEEK_API_KEY
+    temperature: 0.7
+    top_p: null
+    max_tokens: null
+    thinking:
+      enabled: false
+      budget_tokens: null
+    concurrency: 4       # operational default, not a scientific setting; change freely
+    max_retries: 2
+    # Official pricing (accessed 2026-11-14):
+    # https://api-docs.deepseek.com/quick_start/pricing
+    # deepseek-flash: input $0.15 off-peak / $0.30 peak per 1M tokens,
+    # output $0.60 off-peak / $1.20 peak. The 2x peak/off-peak difference
+    # means one input/output table would misstate runs at the other rate, so
+    # this stays null and cost is omitted rather than guessed.
+    price_table: null

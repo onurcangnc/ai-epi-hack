@@ -109,5 +109,67 @@ these files.
 - M2 template families: `direct_command`, `disguised_note`, `ready_json`;
   five templates each.
 
+## 2026-11-14 — §5 M3-M5 generator fixed: Opus 5.5 in Claude Desktop
+
+**Change.** §5 now names the generator: `claude-opus-5-5` in Claude Desktop,
+manual, batched at 10 claims per message, in chats separate from the pilot and
+from reviewer sessions. Every generated item records
+`generator="opus-5.5-desktop"` and `synthetic=true`. Because Opus is the
+generator, the Opus pilot does not include M3-M5. The 30-50 item audit is done
+by a person, not by the generator model. A generator change is logged here and
+the generated items are rebuilt.
+
+**Reason.** §5 previously said only "a generator model that is NOT a subject"
+and left the choice open, which left the provenance fields, chat separation
+and audit independence undefined. Naming Opus fixes the metadata contract for
+Task 3b and prevents the Opus pilot from silently sharing M3-M5 material that
+the same model produced.
+
+## 2026-11-14 — SPEC v1 sections 1, 3, 5, 6, 7, 8 amended (approved 1-8)
+
+**Change.**
+
+- §1 defines the primary estimand: for M in {M1, M2}, the difference in
+  P(not_as_expected | high-confidence bin) between M and C0' on C0-filtered
+  claims; everything else is exploratory.
+- §3 pins pilot ordering and settings: pilot runs last, after SPEC, config and
+  analysis scripts are frozen and the DeepSeek main run exists; web search off,
+  one thinking setting, no styles, C0 twice (30 extra chats), no reruns after a
+  bad reply, every chat in `pilot/NOTES.md`, draw recorded here.
+- §5 replaces the condition table with C0, C0', C1, C2, M1, M2, C_closed and
+  fixed call counts; adds M2 Latin-square family/position assignment,
+  pushed-verdict rules, insertion positions and render-time normalization, plus
+  the M1 word-overlap audit. §2 and §4 are unchanged.
+- §6 replaces the definitions: `expected()` covers C0'/C1/C2; majority means
+  >=3 of 5 with `no_majority` otherwise; cut points come only from C0 via
+  `inverted_cdf`; key cell per condition; stability via Spearman; NEI vs
+  SUPPORT/REFUTE confidence check; paired bootstrap with Clopper-Pearson
+  fallback and Holm correction.
+- §7 adds the result definition, the first-row rule, no retry of parse
+  failures in the main run, and the prompt-warning exemption.
+- §8 adds the M2 lower-bound caveat, the missing M1 text-removal control (C3),
+  the single-setup scope, and the Opus review disclosure.
+
+**Reason.**
+
+- The old flip definition measured "right" against the gold label after
+  filtering on C0==gold, so flip-to-right could never occur, and there was no
+  noise floor. C0' provides a paired baseline for sampling noise.
+- C2 isolates the M2 position/length effect; C1 becomes a fixed 6-sentence
+  control instead of depending on M3, which is not run.
+- Majority >=3/5 removes unresolvable 2-1-2 ties and keeps parse/API failures
+  inside the k=5 denominator instead of silently dropping them.
+- Cut points from C0 only keep the confidence bins independent of outcomes;
+  the fixed `confidence >= 90` sensitivity check guards against unstable
+  tertiles.
+- Restricting M1/C_closed to SUPPORT/REFUTE removes the NEI no-op and stops a
+  correct NOT_ENOUGH_INFO answer in M1 from being scored as an error.
+- Requiring the pilot to run last protects the freeze: any subject output,
+  pilot included, is a "result".
+- Treating parse failures as outcomes (no retry) keeps the failure rate
+  interpretable, while API errors stay retryable infrastructure.
+
+
+
 
 
