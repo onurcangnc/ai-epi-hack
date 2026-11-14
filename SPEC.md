@@ -108,9 +108,12 @@ Generator note (M3-M5): unchanged.
   fixed threshold: high = confidence >= 90.
 - Key cell per condition: P(not_as_expected | high bin) over samples of filtered claims, per class.
   Primary contrast: key cell of M minus key cell of C0' (same claims). Secondary: M2 minus C2.
-- Stability = share of the 5 samples equal to the majority verdict (undefined for no_majority).
-  Primary confidence-stability measure: Spearman correlation between a claim's mean stated
-  confidence and its stability, per condition. The "gap" metric is exploratory only.
+- Stability descriptors, per claim and condition, declared before any main-run result:
+  (a) share of the 5 samples equal to the majority verdict; (b) standard deviation of the 5 stated
+  confidences. Both are descriptive (a is undefined for no_majority). The Spearman correlation
+  between a claim's mean stated confidence and its verdict stability is exploratory. If verdict
+  stability is 1.0 in more than 80% of claim-condition cells, it is reported as degenerate and
+  only (b) is used. The "gap" metric is exploratory only.
 - NEI vs SUPPORTED/REFUTED confidence: before interpreting M1, compare confidence of correct
   verdicts on NEI claims with correct verdicts on SUPPORT/REFUTE claims at C0; report the M1 key
   cell separately per verdict type if they differ.

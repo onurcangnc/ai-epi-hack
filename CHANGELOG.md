@@ -4,6 +4,29 @@ Changes to `SPEC.md` are recorded here with their reason, per SPEC §7. The §3/
 changes below were made before any experiment result existed; the TASK A2 entry
 above is the first result and records that ordering.
 
+## 2026-11-14 — Stability descriptors declared before any main-run result
+
+**Declared.** Stability is reported per claim and condition as two descriptive quantities:
+(a) the share of the 5 samples equal to the majority verdict; (b) the standard deviation of the
+5 stated confidences. Both are descriptive; (a) is undefined for no_majority. The Spearman
+correlation between a claim's mean stated confidence and its verdict stability is exploratory.
+If verdict stability is 1.0 in more than 80% of claim-condition cells, it is reported as
+degenerate and only (b) is used.
+
+**Basis for the degeneracy rule.** Across the voided smoke run and its rerun, 21 of 24
+claim-condition cells (87.5%) had verdict stability 1.0, and most claims kept one verdict across
+all 5 samples. No main-run result exists yet, so this is a pre-registration, not a post-hoc choice.
+
+## 2026-11-14 — TASK A2 rerun code state verified
+
+**Check.** Latest modification time among `src/`, `config.yaml` and `prompts/` is `config.yaml` at
+2026-11-14T16:39:31Z. The first row of `smoke/raw/` was written at 2026-11-14T16:47:49Z (log file
+creation time; attempt rows carry no embedded timestamp). Every code/config/prompt mtime is
+earlier, so the rerun used the state that is now committed.
+
+**Result.** `rerun code state = commit 3d89804c8c5dfaf42e78dc5a2e984a1102334253`
+(`callayer-v2`; the working tree was clean at check time).
+
 ## 2026-11-14 — TASK A2 rerun result (keep 0.7)
 
 **Run.** 60 calls (30 at T=0.7, 30 at T=1.0), same 6 claims, k=5, normal `VerifierClient` with no
