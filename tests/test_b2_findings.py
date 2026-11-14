@@ -250,7 +250,6 @@ def test_non_retryable_backend_error_is_immediate(tmp_path):
     "finish, outcome",
     [
         ("content_filter", "blocked"),
-        ("insufficient_system_resource", "blocked"),
         ("length", "truncated"),
     ],
 )
@@ -261,6 +260,17 @@ def test_non_stop_finish_reasons_are_not_ok(tmp_path, finish, outcome):
     assert row["verdict"] is None
     assert row["raw_response"] == VALID
     assert row["is_result"] is True
+
+
+def test_insufficient_system_resource_is_a_retryable_api_error(tmp_path):
+    client, backend, _ = make_client(
+        tmp_path,
+        [('{"verdict": "SUPP', "insufficient_system_resource"), VALID],
+    )
+    row = call(client)
+    assert row["outcome"] == "ok"
+    assert row["first_attempt_outcome"] == "api_error"
+    assert len(backend.calls) == 2
 
 
 def test_stop_and_valid_json_is_ok(tmp_path):
@@ -401,12 +411,14 @@ def test_run_batch_requires_int_order_seed(tmp_path):
 
 
 def test_run_batch_sorts_before_shuffle_and_rows_carry_keys(tmp_path):
-    client, _, _ = make_client(tmp_path, [VALID] * 4)
+    client, backend, _ = make_client(tmp_path, [VALID] * 4)
     items = [item("c_4"), item("c_2"), item("c_3"), item("c_1")]
-    expected = [entry["claim_id"] for entry in sorted(items, key=lambda e: e["claim_id"])]
-    random.Random(9).shuffle(expected)
+    execution = [entry["claim_id"] for entry in sorted(items, key=lambda e: e["claim_id"])]
+    random.Random(9).shuffle(execution)
     rows = client.run_batch(items, order_seed=9, resume_passes=0)
-    assert [row["claim_id"] for row in rows] == expected
+    # Execution follows sorted-then-shuffled order; the returned list is input order.
+    assert [call["user"].split("Claim ")[1].split(".")[0] for call in backend.calls] == execution
+    assert [row["claim_id"] for row in rows] == ["c_4", "c_2", "c_3", "c_1"]
     assert all(row["cache_key"] for row in rows)
     assert all(row["order_seed"] == 9 for row in rows)
 

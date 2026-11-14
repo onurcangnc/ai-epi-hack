@@ -12,7 +12,7 @@ import re
 
 TAGS = ("<claim>", "</claim>", "<evidence>", "</evidence>")
 
-_TAG_RE = re.compile(r"<\s*(/?)\s*(claim|evidence)\s*>", re.IGNORECASE)
+_TAG_RE = re.compile(r"<\s*(/?)\s*(claim|evidence)\b[^>]*>", re.IGNORECASE)
 
 
 def escape_tag(tag: str) -> str:

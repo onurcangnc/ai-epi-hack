@@ -26,12 +26,16 @@ def redact(text: str) -> str:
 class BackendError(Exception):
     """Base class for backend failures (non-retryable unless subclassed)."""
 
+    def __init__(self, message: str, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
+
 
 class AuthError(BackendError):
     """HTTP 401/402/403: the run must abort, not retry."""
 
     def __init__(self, status: int, message: str) -> None:
-        super().__init__(redact(message))
+        super().__init__(redact(message), status)
         self.status = status
 
 
@@ -39,7 +43,7 @@ class RateLimitError(BackendError):
     """HTTP 429, optionally carrying Retry-After seconds."""
 
     def __init__(self, message: str, retry_after: float | None = None) -> None:
-        super().__init__(redact(message))
+        super().__init__(redact(message), 429)
         self.retry_after = retry_after
 
 
@@ -47,7 +51,7 @@ class ServerError(BackendError):
     """HTTP 5xx."""
 
     def __init__(self, status: int, message: str) -> None:
-        super().__init__(redact(message))
+        super().__init__(redact(message), status)
         self.status = status
 
 
@@ -135,6 +139,7 @@ class DeepSeekBackend:
             payload["thinking"] = thinking.payload()
 
         started = time.monotonic()
+        request_error: BackendError | None = None
         try:
             response = self.session.post(
                 f"{self.base_url}/chat/completions",
@@ -148,7 +153,12 @@ class DeepSeekBackend:
         except requests.Timeout as exc:
             raise BackendTimeout(f"request timed out after {self.timeout}s") from exc
         except requests.RequestException as exc:
-            raise BackendError(redact(f"request failed: {exc}")) from exc
+            # Raised outside the except block: requests echoes the header value
+            # (and therefore the key) in its message, which must not survive in
+            # the exception chain either.
+            request_error = BackendError(redact(f"request failed: {exc}"))
+        if request_error is not None:
+            raise request_error
         latency_ms = (time.monotonic() - started) * 1000.0
 
         status = response.status_code
@@ -162,7 +172,7 @@ class DeepSeekBackend:
             raise ServerError(status, f"server error {status}: {response.text[:500]}")
         if status >= 400:
             raise BackendError(
-                redact(f"request rejected {status}: {response.text[:500]}")
+                redact(f"request rejected {status}: {response.text[:500]}"), status
             )
 
         try:

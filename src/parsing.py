@@ -9,6 +9,7 @@ failure never becomes a verdict.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -35,11 +36,22 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+_FENCE = re.compile(
+    r"^```[A-Za-z]*[ \t]*\r?\n(.*?)\r?\n?```[ \t]*$", re.DOTALL
+)
+
+
+def is_fenced(raw: Any) -> bool:
+    """True when the whole response is one fenced block (```json, ```JSON or bare ```)."""
+    return isinstance(raw, str) and bool(_FENCE.match(raw.strip()))
+
+
 def strip_fence(raw: str) -> str:
-    """Strip exactly one optional ```json fence; leave everything else alone."""
+    """Strip exactly one optional fence; leave everything else alone."""
     text = raw.strip()
-    if text.startswith("```json") and text.endswith("```"):
-        text = text[len("```json") : -len("```")].strip()
+    match = _FENCE.match(text)
+    if match:
+        return match.group(1).strip()
     return text
 
 

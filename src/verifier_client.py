@@ -39,7 +39,7 @@ from backend import (  # noqa: E402
     redact,
 )
 from escaping import escape_tags  # noqa: E402
-from parsing import ParseError, parse_response  # noqa: E402
+from parsing import ParseError, is_fenced, parse_response  # noqa: E402
 from prompts import PromptBundle, load_prompts, render_evidence, render_user  # noqa: E402
 
 RETRYABLE_OUTCOMES = frozenset({"api_error", "parse_failure"})
@@ -246,7 +246,17 @@ def api_key_from_env(config: ModelConfig) -> str:
     key = os.environ.get(config.api_key_env)
     if not key:
         raise ConfigError(f"environment variable {config.api_key_env} is not set")
-    return key
+    cleaned = key.strip()
+    if not cleaned:
+        raise ConfigError(
+            f"environment variable {config.api_key_env} is blank after stripping whitespace"
+        )
+    if any(ord(char) < 32 or ord(char) > 126 for char in cleaned):
+        raise ConfigError(
+            f"environment variable {config.api_key_env} contains control or "
+            "non-ASCII characters; refusing to use it"
+        )
+    return cleaned
 
 
 def _backoff_seconds(attempt: int) -> float:
@@ -273,6 +283,9 @@ class VerifierClient:
         self.log_path = Path(log_path)
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         self.cache_dir = None if cache_dir is None else Path(cache_dir)
+        self.prompt_store = (
+            None if self.cache_dir is None else self.cache_dir.parent / "prompts_rendered"
+        )
         self._sleep = sleep
         self._cache: dict[str, dict[str, Any]] = {}
         self._state_lock = threading.RLock()
@@ -281,6 +294,15 @@ class VerifierClient:
         if self.cache_dir is not None:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             self._load_disk_cache()
+        if self.prompt_store is not None:
+            self.prompt_store.mkdir(parents=True, exist_ok=True)
+
+    def _store_prompt(self, text: str) -> None:
+        """Write a rendered prompt once, addressed by its sha256."""
+        assert self.prompt_store is not None
+        target = self.prompt_store / f"{_sha256(text)}.txt"
+        if not target.exists():
+            target.write_text(text, encoding="utf-8")
 
     # ------------------------------------------------------------------ #
     # Cache helpers
@@ -359,6 +381,7 @@ class VerifierClient:
         condition: str | None,
         sample_idx: int,
         cache_key: str,
+        user_prompt: str = "",
         user_prompt_sha256: str,
         escapes: list[dict[str, str]],
         outcome: str,
@@ -376,8 +399,10 @@ class VerifierClient:
         attempts: int = 0,
         is_result: bool = True,
         finish_reason: str | None = None,
+        http_status: int | None = None,
         order_seed: int | None = None,
         resume_pass: int = 0,
+        cache_write_failed: bool = False,
         error: str | None = None,
     ) -> dict[str, Any]:
         row = {
@@ -392,6 +417,7 @@ class VerifierClient:
             "config_hash": self.config.config_hash,
             "system_prompt_sha256": self.prompts.system_sha256,
             "user_template_sha256": self.prompts.user_sha256,
+            "user_prompt": user_prompt,
             "user_prompt_sha256": user_prompt_sha256,
             "outcome": outcome,
             "verdict": parsed["verdict"] if parsed else None,
@@ -399,9 +425,12 @@ class VerifierClient:
             "rationale": parsed["rationale"] if parsed else None,
             "evidence_concerns": parsed["evidence_concerns"] if parsed else None,
             "raw_response": raw_response,
+            "fenced": is_fenced(raw_response),
             "finish_reason": finish_reason,
             "finish_reason_last": finish_reason,
-            "http_status": getattr(result, "http_status", None),
+            "http_status": http_status
+            if http_status is not None
+            else getattr(result, "http_status", None),
             "reasoning_tokens": getattr(result, "reasoning_tokens", None),
             "response_model": getattr(result, "model", None),
             "system_fingerprint": getattr(result, "system_fingerprint", None),
@@ -413,6 +442,7 @@ class VerifierClient:
             "used_attempt_idx": used_attempt_idx,
             "is_result": is_result,
             "cached": cached,
+            "cache_write_failed": cache_write_failed,
             "attempts": attempts,
             "escapes": escapes,
             "error": redact(error) if error else None,
@@ -451,6 +481,9 @@ class VerifierClient:
 
         user_prompt = render_user(self.prompts.user_template, claim_text, evidence_text)
         user_prompt_sha256 = _sha256(user_prompt)
+        if self.prompt_store is not None:
+            self._store_prompt(self.prompts.system)
+            self._store_prompt(user_prompt)
         key = self.cache_key(condition, user_prompt, sample_idx)
 
         lock = self._lock_for(key)
@@ -461,7 +494,7 @@ class VerifierClient:
                 return self._replay(
                     cached_entry, claim_id=claim_id, condition=condition,
                     sample_idx=sample_idx, key=key,
-                    user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                    user_prompt=user_prompt, user_prompt_sha256=user_prompt_sha256, escapes=escapes,
                     order_seed=order_seed, resume_pass=resume_pass,
                 )
 
@@ -491,13 +524,14 @@ class VerifierClient:
                         self._row(
                             claim_id=claim_id, condition=condition,
                             sample_idx=sample_idx, cache_key=key,
-                            user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                            user_prompt=user_prompt, user_prompt_sha256=user_prompt_sha256, escapes=escapes,
                             outcome="api_error", raw_response=None, parsed=None,
                             attempt_idx=attempt_idx, total_attempts=attempt_idx + 1,
                             first_attempt_outcome=first_attempt_outcome or "api_error",
                             used_attempt_idx=attempt_idx, attempts=attempt_idx,
                             is_result=False, order_seed=order_seed,
                             resume_pass=resume_pass, error=str(exc),
+                            http_status=exc.status,
                         )
                     )
                     raise RunAborted(exc.status, str(exc)) from exc
@@ -521,13 +555,14 @@ class VerifierClient:
                             self._row(
                                 claim_id=claim_id, condition=condition,
                                 sample_idx=sample_idx, cache_key=key,
-                                user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                                user_prompt=user_prompt, user_prompt_sha256=user_prompt_sha256, escapes=escapes,
                                 outcome=outcome, raw_response=None, parsed=None,
                                 attempt_idx=attempt_idx, total_attempts=attempt_idx + 1,
                                 first_attempt_outcome=first_attempt_outcome,
                                 used_attempt_idx=None, attempts=attempt_idx,
                                 is_result=False, order_seed=order_seed,
                                 resume_pass=resume_pass, error=str(call_error),
+                                http_status=getattr(call_error, "status", None),
                             )
                         )
                         attempt_idx += 1
@@ -542,18 +577,61 @@ class VerifierClient:
                     row = self._row(
                         claim_id=claim_id, condition=condition,
                         sample_idx=sample_idx, cache_key=key,
-                        user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                        user_prompt=user_prompt, user_prompt_sha256=user_prompt_sha256, escapes=escapes,
                         outcome=outcome, raw_response=None, parsed=None,
                         attempt_idx=attempt_idx, total_attempts=attempt_idx + 1,
                         first_attempt_outcome=first_attempt_outcome,
                         used_attempt_idx=attempt_idx, attempts=attempt_idx,
                         is_result=is_last_pass, order_seed=order_seed,
                         resume_pass=resume_pass, error=str(call_error),
+                        http_status=getattr(call_error, "status", None),
                     )
                     self._log(row)
                     return row
 
                 finish_reason = result.finish_reason
+                if finish_reason == "insufficient_system_resource":
+                    # DeepSeek documents this as a server-side interruption, so
+                    # it is an API failure to retry, not a model reply.
+                    if first_attempt_outcome is None:
+                        first_attempt_outcome = "api_error"
+                    can_retry = retry_api and attempt_idx + 1 < attempts_limit
+                    if can_retry:
+                        self._log(
+                            self._row(
+                                claim_id=claim_id, condition=condition,
+                                sample_idx=sample_idx, cache_key=key,
+                                user_prompt=user_prompt, user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                                outcome="api_error", raw_response=None, parsed=None,
+                                attempt_idx=attempt_idx,
+                                total_attempts=attempt_idx + 1,
+                                first_attempt_outcome=first_attempt_outcome,
+                                used_attempt_idx=None, attempts=attempt_idx,
+                                is_result=False, finish_reason=finish_reason,
+                                http_status=503, order_seed=order_seed,
+                                resume_pass=resume_pass,
+                                error="insufficient_system_resource",
+                            )
+                        )
+                        attempt_idx += 1
+                        self._sleep(_backoff_seconds(attempt_idx))
+                        continue
+                    row = self._row(
+                        claim_id=claim_id, condition=condition,
+                        sample_idx=sample_idx, cache_key=key,
+                        user_prompt=user_prompt, user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                        outcome="api_error", raw_response=None, parsed=None,
+                        attempt_idx=attempt_idx, total_attempts=attempt_idx + 1,
+                        first_attempt_outcome=first_attempt_outcome,
+                        used_attempt_idx=attempt_idx, attempts=attempt_idx,
+                        is_result=is_last_pass, finish_reason=finish_reason,
+                        http_status=503, order_seed=order_seed,
+                        resume_pass=resume_pass,
+                        error="insufficient_system_resource",
+                    )
+                    self._log(row)
+                    return row
+
                 if finish_reason != "stop":
                     outcome = (
                         "blocked"
@@ -563,7 +641,7 @@ class VerifierClient:
                     row = self._row(
                         claim_id=claim_id, condition=condition,
                         sample_idx=sample_idx, cache_key=key,
-                        user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                        user_prompt=user_prompt, user_prompt_sha256=user_prompt_sha256, escapes=escapes,
                         outcome=outcome, raw_response=_raw_text(result.text),
                         parsed=None, result=result,
                         input_tokens=result.input_tokens,
@@ -590,7 +668,7 @@ class VerifierClient:
                             self._row(
                                 claim_id=claim_id, condition=condition,
                                 sample_idx=sample_idx, cache_key=key,
-                                user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                                user_prompt=user_prompt, user_prompt_sha256=user_prompt_sha256, escapes=escapes,
                                 outcome=outcome, raw_response=_raw_text(result.text),
                                 parsed=None, result=result,
                                 input_tokens=result.input_tokens,
@@ -610,7 +688,7 @@ class VerifierClient:
                     row = self._row(
                         claim_id=claim_id, condition=condition,
                         sample_idx=sample_idx, cache_key=key,
-                        user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                        user_prompt=user_prompt, user_prompt_sha256=user_prompt_sha256, escapes=escapes,
                         outcome=outcome, raw_response=_raw_text(result.text),
                         parsed=None, result=result,
                         input_tokens=result.input_tokens,
@@ -644,12 +722,18 @@ class VerifierClient:
                 }
                 with self._state_lock:
                     self._cache[key] = entry
-                    if self.cache_dir is not None:
+                cache_write_failed = False
+                if self.cache_dir is not None:
+                    try:
                         self._disk_store(key, entry)
+                    except OSError:
+                        # The paid reply must still reach the log; the disk cache
+                        # is an optimisation, not the record of truth.
+                        cache_write_failed = True
                 row = self._row(
                     claim_id=claim_id, condition=condition,
                     sample_idx=sample_idx, cache_key=key,
-                    user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                    user_prompt=user_prompt, user_prompt_sha256=user_prompt_sha256, escapes=escapes,
                     outcome="ok", raw_response=_raw_text(result.text),
                     parsed=parsed, result=result,
                     input_tokens=result.input_tokens,
@@ -660,6 +744,7 @@ class VerifierClient:
                     used_attempt_idx=attempt_idx, attempts=attempt_idx,
                     is_result=True, finish_reason=finish_reason,
                     order_seed=order_seed, resume_pass=resume_pass,
+                    cache_write_failed=cache_write_failed,
                 )
                 self._log(row)
                 return row
@@ -672,12 +757,16 @@ class VerifierClient:
         condition: str | None,
         sample_idx: int,
         key: str,
+        user_prompt: str,
         user_prompt_sha256: str,
         escapes: list[dict[str, str]],
         order_seed: int | None,
         resume_pass: int,
     ) -> dict[str, Any]:
         raw = entry.get("raw")
+        if self.prompt_store is not None:
+            self._store_prompt(self.prompts.system)
+            self._store_prompt(user_prompt)
         try:
             parsed = parse_response(raw)
             outcome = "ok"
@@ -688,7 +777,7 @@ class VerifierClient:
             error = str(exc)
         row = self._row(
             claim_id=claim_id, condition=condition, sample_idx=sample_idx,
-            cache_key=key, user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+            cache_key=key, user_prompt=user_prompt, user_prompt_sha256=user_prompt_sha256, escapes=escapes,
             outcome=outcome, raw_response=raw, parsed=parsed,
             input_tokens=entry.get("input_tokens"),
             output_tokens=entry.get("output_tokens"),
@@ -704,13 +793,26 @@ class VerifierClient:
         self._log(row)
         return row
 
+    def _unit_cache_key(self, item: dict[str, Any]) -> str:
+        claim_text, _ = escape_tags(str(item.get("claim", "")))
+        evidence_raw = render_evidence(item.get("evidence_sentences") or [])
+        evidence_text, _ = escape_tags(evidence_raw)
+        user_prompt = render_user(self.prompts.user_template, claim_text, evidence_text)
+        return self.cache_key(
+            item.get("condition"), user_prompt, int(item.get("sample_idx", 0))
+        )
+
     def run_batch(
         self,
         items: list[dict[str, Any]],
         order_seed: int,
         resume_passes: int = 2,
     ) -> list[dict[str, Any]]:
-        """Run verify() calls in a seeded shuffle with crash-resume support."""
+        """Run verify() calls in a seeded shuffle with crash-resume support.
+
+        Units are matched to rows by cache key (never by position) and the
+        returned list follows the input order.
+        """
         if isinstance(order_seed, bool) or not isinstance(order_seed, int):
             raise TypeError("order_seed must be an int")
         if resume_passes < 0:
@@ -724,40 +826,40 @@ class VerifierClient:
         ))
         random.Random(order_seed).shuffle(ordered)
 
-        done = self._finished_keys()
-        ordered = [
-            item for item in ordered
-            if (
-                str(item.get("claim_id")),
-                item.get("condition"),
-                int(item.get("sample_idx", 0)),
-            )
-            not in done
-        ]
+        done = self._finished_cache_keys()
+        pending = [item for item in ordered if self._unit_cache_key(item) not in done]
 
-        rows: list[dict[str, Any]] = []
-        last_pass = resume_passes == 0
-        for item in ordered:
-            rows.append(
-                self.verify(**item, order_seed=order_seed, resume_pass=0, is_last_pass=last_pass)
+        rows_by_key: dict[str, dict[str, Any]] = {}
+        for item in pending:
+            row = self.verify(
+                **item, order_seed=order_seed, resume_pass=0,
+                is_last_pass=(resume_passes == 0),
             )
+            rows_by_key[row["cache_key"]] = row
 
         for pass_index in range(1, resume_passes + 1):
-            failing = [item for item, row in zip(ordered, rows) if row["outcome"] == "api_error"]
+            failing = [
+                item for item in pending
+                if rows_by_key[self._unit_cache_key(item)]["outcome"] == "api_error"
+            ]
             if not failing:
                 break
             final = pass_index == resume_passes
-            new_rows = []
             for item in failing:
-                new_rows.append(
-                    self.verify(**item, order_seed=order_seed,
-                                resume_pass=pass_index, is_last_pass=final)
+                row = self.verify(
+                    **item, order_seed=order_seed,
+                    resume_pass=pass_index, is_last_pass=final,
                 )
-            rows = [row for row in rows if row["outcome"] != "api_error"] + new_rows
-        return rows
+                rows_by_key[row["cache_key"]] = row
 
-    def _finished_keys(self) -> set[tuple[str, str | None, int]]:
-        done: set[tuple[str, str | None, int]] = set()
+        return [
+            rows_by_key[key]
+            for key in (self._unit_cache_key(item) for item in items)
+            if key in rows_by_key
+        ]
+
+    def _finished_cache_keys(self) -> set[str]:
+        done: set[str] = set()
         if not self.log_path.is_file():
             return done
         with self.log_path.open(encoding="utf-8") as fh:
@@ -769,12 +871,6 @@ class VerifierClient:
                     row = json.loads(line)
                 except ValueError:
                     continue
-                if row.get("is_result"):
-                    done.add(
-                        (
-                            str(row.get("claim_id")),
-                            row.get("condition"),
-                            int(row.get("sample_idx", 0)),
-                        )
-                    )
+                if row.get("is_result") and row.get("cache_key"):
+                    done.add(str(row["cache_key"]))
         return done
