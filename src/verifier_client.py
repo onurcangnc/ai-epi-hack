@@ -1,13 +1,9 @@
 """Verifier call layer (DeepSeek only).
 
 Wires the frozen prompts, DeepSeek backend, strict parser, persistent cache,
-configurable retry/backoff and JSONL logging together. Everything that can vary
-between calls is recorded per log row so results stay auditable.
-
-Configuration lives under ``models.deepseek`` in config.yaml (retry policy
-included). The cache directory comes from ``cache.dir``. Values that the human
-has not set are left null and raise ``ConfigError`` naming the key, so a run can
-never silently use an invented default.
+configurable retry/abort policy, resume passes and JSONL logging together.
+Everything that can vary between calls is recorded per log row so results stay
+auditable.
 """
 
 from __future__ import annotations
@@ -19,8 +15,10 @@ import random
 import sys
 import threading
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -32,22 +30,36 @@ if str(_ROOT / "scripts") not in sys.path:  # pragma: no cover - import plumbing
 
 from common import VERDICTS  # noqa: E402,F401  (imported for the stated vocabulary)
 from backend import (  # noqa: E402
+    AuthError,
     BackendError,
     BackendTimeout,
     RateLimitError,
     ServerError,
     ThinkingConfig,
+    redact,
 )
 from escaping import escape_tags  # noqa: E402
 from parsing import ParseError, parse_response  # noqa: E402
 from prompts import PromptBundle, load_prompts, render_evidence, render_user  # noqa: E402
 
-# The only outcomes a retry policy may name.
 RETRYABLE_OUTCOMES = frozenset({"api_error", "parse_failure"})
+BLOCKED_FINISH_REASONS = frozenset(
+    {"content_filter", "insufficient_system_resource"}
+)
+MAX_BACKOFF_SECONDS = 60.0
+CACHE_REPLACE_ATTEMPTS = 3
 
 
 class ConfigError(ValueError):
     """Raised when model config is missing or still null."""
+
+
+class RunAborted(Exception):
+    """401/402/403: the whole run must stop, not retry."""
+
+    def __init__(self, status: int, message: str) -> None:
+        super().__init__(redact(message))
+        self.status = status
 
 
 def _non_null(value: Any, key: str) -> Any:
@@ -58,6 +70,25 @@ def _non_null(value: Any, key: str) -> Any:
 
 def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _raw_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return repr(value)
+
+
+def _redact_row(value: Any) -> Any:
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, list):
+        return [_redact_row(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _redact_row(item) for key, item in value.items()}
+    return value
 
 
 @dataclass(frozen=True)
@@ -119,14 +150,10 @@ class ModelConfig:
             raise ConfigError("config key 'models.deepseek.max_retries' must be a non-negative integer")
 
         if not isinstance(retry_on, list) or not retry_on:
-            raise ConfigError(
-                "config key 'models.deepseek.retry_on' must be a non-empty list"
-            )
+            raise ConfigError("config key 'models.deepseek.retry_on' must be a non-empty list")
         for outcome in retry_on:
             if not isinstance(outcome, str):
-                raise ConfigError(
-                    "config key 'models.deepseek.retry_on' must contain strings"
-                )
+                raise ConfigError("config key 'models.deepseek.retry_on' must contain strings")
         unknown = sorted(set(retry_on) - RETRYABLE_OUTCOMES)
         if unknown:
             raise ConfigError(
@@ -223,7 +250,8 @@ def api_key_from_env(config: ModelConfig) -> str:
 
 
 def _backoff_seconds(attempt: int) -> float:
-    return min(30.0, 0.5 * (2 ** (attempt - 1)))
+    """Exponential backoff after failure ``attempt`` (1-based), capped at 60 s."""
+    return min(MAX_BACKOFF_SECONDS, 0.5 * (2 ** (attempt - 1)))
 
 
 class VerifierClient:
@@ -247,13 +275,15 @@ class VerifierClient:
         self.cache_dir = None if cache_dir is None else Path(cache_dir)
         self._sleep = sleep
         self._cache: dict[str, dict[str, Any]] = {}
-        self._lock = threading.Lock()
+        self._state_lock = threading.RLock()
+        self._log_lock = threading.Lock()
+        self._key_locks: dict[str, threading.Lock] = {}
         if self.cache_dir is not None:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             self._load_disk_cache()
 
     # ------------------------------------------------------------------ #
-    # Cache / logging helpers
+    # Cache helpers
     # ------------------------------------------------------------------ #
     def _load_disk_cache(self) -> None:
         assert self.cache_dir is not None
@@ -270,22 +300,42 @@ class VerifierClient:
     def _disk_store(self, key: str, entry: dict[str, Any]) -> None:
         assert self.cache_dir is not None
         target = self.cache_dir / f"{key}.json"
-        temporary = self.cache_dir / f".{key}.json.tmp"
+        temporary = self.cache_dir / f".{key}.{uuid.uuid4().hex}.tmp"
         temporary.write_text(
             json.dumps({"key": key, **entry}, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
-        os.replace(temporary, target)
+        for attempt in range(1, CACHE_REPLACE_ATTEMPTS + 1):
+            try:
+                os.replace(temporary, target)
+                return
+            except PermissionError:
+                if attempt == CACHE_REPLACE_ATTEMPTS:
+                    raise
+                time.sleep(0.05 * attempt)
 
-    def _cache_key(self, user_prompt: str, sample_idx: int) -> str:
-        payload = [
-            self.config.model,
-            self.config.config_hash,
-            self.prompts.system_sha256,
-            _sha256(user_prompt),
-            sample_idx,
-        ]
-        return _sha256(json.dumps(payload))
+    def _lock_for(self, key: str) -> threading.Lock:
+        with self._state_lock:
+            lock = self._key_locks.get(key)
+            if lock is None:
+                lock = threading.Lock()
+                self._key_locks[key] = lock
+            return lock
+
+    def cache_key(self, condition: str | None, user_prompt: str, sample_idx: int) -> str:
+        """sha256 over every input that can change a cached answer."""
+        payload = {
+            "condition": condition,
+            "model": self.config.model,
+            "base_url": self.config.base_url,
+            "output_config": self.config.output_config(),
+            "retry_on": list(self.config.retry_on),
+            "system_prompt_sha256": self.prompts.system_sha256,
+            "user_template_sha256": self.prompts.user_sha256,
+            "user_prompt_sha256": _sha256(user_prompt),
+            "sample_idx": sample_idx,
+        }
+        return _sha256(json.dumps(payload, sort_keys=True))
 
     def _cost(self, input_tokens: int | None, output_tokens: int | None) -> float | None:
         table = self.config.price_table
@@ -297,8 +347,8 @@ class VerifierClient:
         ) / 1_000_000
 
     def _log(self, row: dict[str, Any]) -> None:
-        line = json.dumps(row, ensure_ascii=False)
-        with self._lock:
+        line = json.dumps(_redact_row(row), ensure_ascii=False)
+        with self._log_lock:
             with self.log_path.open("a", encoding="utf-8", newline="\n") as fh:
                 fh.write(line + "\n")
 
@@ -308,23 +358,26 @@ class VerifierClient:
         claim_id: str,
         condition: str | None,
         sample_idx: int,
+        cache_key: str,
         user_prompt_sha256: str,
         escapes: list[dict[str, str]],
         outcome: str,
         raw_response: str | None,
         parsed: dict[str, Any] | None,
-        input_tokens: int | None,
-        output_tokens: int | None,
-        latency_ms: float | None,
-        attempt_idx: int,
-        total_attempts: int,
-        first_attempt_outcome: str,
-        used_attempt_idx: int | None,
-        cached: bool,
-        attempts: int,
-        is_result: bool,
+        result: Any = None,
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
+        latency_ms: float | None = None,
+        attempt_idx: int = 0,
+        total_attempts: int = 1,
+        first_attempt_outcome: str | None = None,
+        used_attempt_idx: int | None = None,
+        cached: bool = False,
+        attempts: int = 0,
+        is_result: bool = True,
         finish_reason: str | None = None,
-        order_seed: Any = None,
+        order_seed: int | None = None,
+        resume_pass: int = 0,
         error: str | None = None,
     ) -> dict[str, Any]:
         row = {
@@ -333,8 +386,12 @@ class VerifierClient:
             "model": self.config.model,
             "sample_idx": sample_idx,
             "order_seed": order_seed,
+            "resume_pass": resume_pass,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "cache_key": cache_key,
             "config_hash": self.config.config_hash,
             "system_prompt_sha256": self.prompts.system_sha256,
+            "user_template_sha256": self.prompts.user_sha256,
             "user_prompt_sha256": user_prompt_sha256,
             "outcome": outcome,
             "verdict": parsed["verdict"] if parsed else None,
@@ -344,6 +401,10 @@ class VerifierClient:
             "raw_response": raw_response,
             "finish_reason": finish_reason,
             "finish_reason_last": finish_reason,
+            "http_status": getattr(result, "http_status", None),
+            "reasoning_tokens": getattr(result, "reasoning_tokens", None),
+            "response_model": getattr(result, "model", None),
+            "system_fingerprint": getattr(result, "system_fingerprint", None),
             "tokens": {"input": input_tokens, "output": output_tokens},
             "latency_ms": latency_ms,
             "attempt_idx": attempt_idx,
@@ -354,7 +415,7 @@ class VerifierClient:
             "cached": cached,
             "attempts": attempts,
             "escapes": escapes,
-            "error": error,
+            "error": redact(error) if error else None,
         }
         cost = self._cost(input_tokens, output_tokens)
         if cost is not None:
@@ -372,7 +433,9 @@ class VerifierClient:
         evidence_sentences: list[dict[str, Any]],
         sample_idx: int = 0,
         condition: str | None = None,
-        order_seed: Any = None,
+        order_seed: int | None = None,
+        resume_pass: int = 0,
+        is_last_pass: bool = True,
     ) -> dict[str, Any]:
         """Run one verifier call (with retries/cache) and log the result."""
         claim_text, claim_tags = escape_tags(claim)
@@ -388,193 +451,330 @@ class VerifierClient:
 
         user_prompt = render_user(self.prompts.user_template, claim_text, evidence_text)
         user_prompt_sha256 = _sha256(user_prompt)
-        key = self._cache_key(user_prompt, sample_idx)
+        key = self.cache_key(condition, user_prompt, sample_idx)
 
-        with self._lock:
-            cached_entry = self._cache.get(key)
-        if cached_entry is not None:
-            row = self._row(
-                claim_id=claim_id,
-                condition=condition,
-                sample_idx=sample_idx,
-                user_prompt_sha256=user_prompt_sha256,
-                escapes=escapes,
-                outcome="ok",
-                raw_response=cached_entry["raw"],
-                parsed=cached_entry["parsed"],
-                input_tokens=cached_entry["input_tokens"],
-                output_tokens=cached_entry["output_tokens"],
-                latency_ms=cached_entry["latency_ms"],
-                attempt_idx=cached_entry["attempt_idx"],
-                total_attempts=cached_entry["total_attempts"],
-                first_attempt_outcome=cached_entry["first_attempt_outcome"],
-                used_attempt_idx=cached_entry["attempt_idx"],
-                cached=True,
-                attempts=cached_entry["attempts"],
-                is_result=True,
-                finish_reason=cached_entry.get("finish_reason"),
-                order_seed=order_seed,
+        lock = self._lock_for(key)
+        with lock:
+            with self._state_lock:
+                cached_entry = self._cache.get(key)
+            if cached_entry is not None:
+                return self._replay(
+                    cached_entry, claim_id=claim_id, condition=condition,
+                    sample_idx=sample_idx, key=key,
+                    user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                    order_seed=order_seed, resume_pass=resume_pass,
+                )
+
+            attempts_limit = self.config.max_retries + 1
+            attempt_idx = 0
+            first_attempt_outcome: str | None = None
+            retry_api = "api_error" in self.config.retry_on
+            retry_parse = "parse_failure" in self.config.retry_on
+            thinking = ThinkingConfig(
+                enabled=self.config.thinking_enabled,
+                budget_tokens=self.config.thinking_budget_tokens,
             )
-            self._log(row)
-            return row
+            while True:
+                call_error: Exception | None = None
+                retryable_type = False
+                try:
+                    result = self.backend.complete(
+                        self.prompts.system,
+                        user_prompt,
+                        temperature=self.config.temperature,
+                        top_p=self.config.top_p,
+                        max_tokens=self.config.max_tokens,
+                        thinking=thinking,
+                    )
+                except AuthError as exc:
+                    self._log(
+                        self._row(
+                            claim_id=claim_id, condition=condition,
+                            sample_idx=sample_idx, cache_key=key,
+                            user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                            outcome="api_error", raw_response=None, parsed=None,
+                            attempt_idx=attempt_idx, total_attempts=attempt_idx + 1,
+                            first_attempt_outcome=first_attempt_outcome or "api_error",
+                            used_attempt_idx=attempt_idx, attempts=attempt_idx,
+                            is_result=False, order_seed=order_seed,
+                            resume_pass=resume_pass, error=str(exc),
+                        )
+                    )
+                    raise RunAborted(exc.status, str(exc)) from exc
+                except (RateLimitError, ServerError, BackendTimeout) as exc:
+                    call_error = exc
+                    retryable_type = True
+                except BackendError as exc:
+                    call_error = exc
 
-        attempts = 0
-        first_attempt_outcome: str | None = None
-        retry_api = "api_error" in self.config.retry_on
-        retry_parse = "parse_failure" in self.config.retry_on
-        thinking = ThinkingConfig(
-            enabled=self.config.thinking_enabled,
-            budget_tokens=self.config.thinking_budget_tokens,
-        )
-        while True:
-            attempt_idx = attempts
-            call_error: Exception | None = None
-            retryable_type = False
-            try:
-                result = self.backend.complete(
-                    self.prompts.system,
-                    user_prompt,
-                    temperature=self.config.temperature,
-                    top_p=self.config.top_p,
-                    max_tokens=self.config.max_tokens,
-                    thinking=thinking,
-                )
-            except (RateLimitError, ServerError, BackendTimeout) as exc:
-                call_error = exc
-                retryable_type = True
-            except BackendError as exc:
-                call_error = exc
-
-            if call_error is not None:
-                outcome = "api_error"
-                if first_attempt_outcome is None:
-                    first_attempt_outcome = outcome
-                retryable = retryable_type and retry_api
-                is_final = (not retryable) or attempts >= self.config.max_retries
-                row = self._row(
-                    claim_id=claim_id,
-                    condition=condition,
-                    sample_idx=sample_idx,
-                    user_prompt_sha256=user_prompt_sha256,
-                    escapes=escapes,
-                    outcome=outcome,
-                    raw_response=None,
-                    parsed=None,
-                    input_tokens=None,
-                    output_tokens=None,
-                    latency_ms=None,
-                    attempt_idx=attempt_idx,
-                    total_attempts=attempt_idx + 1,
-                    first_attempt_outcome=first_attempt_outcome,
-                    used_attempt_idx=attempt_idx if is_final else None,
-                    cached=False,
-                    attempts=attempts,
-                    is_result=is_final,
-                    finish_reason=None,
-                    order_seed=order_seed,
-                    error=str(call_error),
-                )
-                self._log(row)
-                if is_final:
+                if call_error is not None:
+                    outcome = "api_error"
+                    if first_attempt_outcome is None:
+                        first_attempt_outcome = outcome
+                    can_retry = (
+                        retryable_type
+                        and retry_api
+                        and attempt_idx + 1 < attempts_limit
+                    )
+                    if can_retry:
+                        self._log(
+                            self._row(
+                                claim_id=claim_id, condition=condition,
+                                sample_idx=sample_idx, cache_key=key,
+                                user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                                outcome=outcome, raw_response=None, parsed=None,
+                                attempt_idx=attempt_idx, total_attempts=attempt_idx + 1,
+                                first_attempt_outcome=first_attempt_outcome,
+                                used_attempt_idx=None, attempts=attempt_idx,
+                                is_result=False, order_seed=order_seed,
+                                resume_pass=resume_pass, error=str(call_error),
+                            )
+                        )
+                        attempt_idx += 1
+                        delay = (
+                            call_error.retry_after
+                            if isinstance(call_error, RateLimitError)
+                            and call_error.retry_after is not None
+                            else _backoff_seconds(attempt_idx)
+                        )
+                        self._sleep(min(MAX_BACKOFF_SECONDS, delay))
+                        continue
+                    row = self._row(
+                        claim_id=claim_id, condition=condition,
+                        sample_idx=sample_idx, cache_key=key,
+                        user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                        outcome=outcome, raw_response=None, parsed=None,
+                        attempt_idx=attempt_idx, total_attempts=attempt_idx + 1,
+                        first_attempt_outcome=first_attempt_outcome,
+                        used_attempt_idx=attempt_idx, attempts=attempt_idx,
+                        is_result=is_last_pass, order_seed=order_seed,
+                        resume_pass=resume_pass, error=str(call_error),
+                    )
+                    self._log(row)
                     return row
-                attempts += 1
-                self._sleep(_backoff_seconds(attempts))
-                continue
 
-            try:
-                parsed = parse_response(result.text)
-            except ParseError:
-                outcome = "parse_failure"
-                if first_attempt_outcome is None:
-                    first_attempt_outcome = outcome
-                # A parse failure is an outcome, not a transport accident: it is
-                # retried only when the config explicitly lists it.
-                is_final = (not retry_parse) or attempts >= self.config.max_retries
+                finish_reason = result.finish_reason
+                if finish_reason != "stop":
+                    outcome = (
+                        "blocked"
+                        if finish_reason in BLOCKED_FINISH_REASONS
+                        else "truncated"
+                    )
+                    row = self._row(
+                        claim_id=claim_id, condition=condition,
+                        sample_idx=sample_idx, cache_key=key,
+                        user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                        outcome=outcome, raw_response=_raw_text(result.text),
+                        parsed=None, result=result,
+                        input_tokens=result.input_tokens,
+                        output_tokens=result.output_tokens,
+                        latency_ms=result.latency_ms,
+                        attempt_idx=attempt_idx, total_attempts=attempt_idx + 1,
+                        first_attempt_outcome=first_attempt_outcome or outcome,
+                        used_attempt_idx=attempt_idx, attempts=attempt_idx,
+                        is_result=True, finish_reason=finish_reason,
+                        order_seed=order_seed, resume_pass=resume_pass,
+                    )
+                    self._log(row)
+                    return row
+
+                try:
+                    parsed = parse_response(result.text)
+                except ParseError as exc:
+                    outcome = "parse_failure"
+                    if first_attempt_outcome is None:
+                        first_attempt_outcome = outcome
+                    can_retry = retry_parse and attempt_idx + 1 < attempts_limit
+                    if can_retry:
+                        self._log(
+                            self._row(
+                                claim_id=claim_id, condition=condition,
+                                sample_idx=sample_idx, cache_key=key,
+                                user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                                outcome=outcome, raw_response=_raw_text(result.text),
+                                parsed=None, result=result,
+                                input_tokens=result.input_tokens,
+                                output_tokens=result.output_tokens,
+                                latency_ms=result.latency_ms,
+                                attempt_idx=attempt_idx,
+                                total_attempts=attempt_idx + 1,
+                                first_attempt_outcome=first_attempt_outcome,
+                                used_attempt_idx=None, attempts=attempt_idx,
+                                is_result=False, finish_reason=finish_reason,
+                                order_seed=order_seed, resume_pass=resume_pass,
+                                error=str(exc),
+                            )
+                        )
+                        attempt_idx += 1
+                        continue
+                    row = self._row(
+                        claim_id=claim_id, condition=condition,
+                        sample_idx=sample_idx, cache_key=key,
+                        user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                        outcome=outcome, raw_response=_raw_text(result.text),
+                        parsed=None, result=result,
+                        input_tokens=result.input_tokens,
+                        output_tokens=result.output_tokens,
+                        latency_ms=result.latency_ms,
+                        attempt_idx=attempt_idx, total_attempts=attempt_idx + 1,
+                        first_attempt_outcome=first_attempt_outcome,
+                        used_attempt_idx=attempt_idx, attempts=attempt_idx,
+                        is_result=True, finish_reason=finish_reason,
+                        order_seed=order_seed, resume_pass=resume_pass,
+                        error=str(exc),
+                    )
+                    self._log(row)
+                    return row
+
+                entry = {
+                    "parsed": parsed,
+                    "raw": _raw_text(result.text),
+                    "input_tokens": result.input_tokens,
+                    "output_tokens": result.output_tokens,
+                    "latency_ms": result.latency_ms,
+                    "finish_reason": finish_reason,
+                    "http_status": result.http_status,
+                    "reasoning_tokens": result.reasoning_tokens,
+                    "response_model": result.model,
+                    "system_fingerprint": result.system_fingerprint,
+                    "attempt_idx": attempt_idx,
+                    "total_attempts": attempt_idx + 1,
+                    "first_attempt_outcome": first_attempt_outcome or "ok",
+                    "attempts": attempt_idx,
+                }
+                with self._state_lock:
+                    self._cache[key] = entry
+                    if self.cache_dir is not None:
+                        self._disk_store(key, entry)
                 row = self._row(
-                    claim_id=claim_id,
-                    condition=condition,
-                    sample_idx=sample_idx,
-                    user_prompt_sha256=user_prompt_sha256,
-                    escapes=escapes,
-                    outcome=outcome,
-                    raw_response=result.text,
-                    parsed=None,
+                    claim_id=claim_id, condition=condition,
+                    sample_idx=sample_idx, cache_key=key,
+                    user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                    outcome="ok", raw_response=_raw_text(result.text),
+                    parsed=parsed, result=result,
                     input_tokens=result.input_tokens,
                     output_tokens=result.output_tokens,
                     latency_ms=result.latency_ms,
-                    attempt_idx=attempt_idx,
-                    total_attempts=attempt_idx + 1,
-                    first_attempt_outcome=first_attempt_outcome,
-                    used_attempt_idx=attempt_idx if is_final else None,
-                    cached=False,
-                    attempts=attempts,
-                    is_result=is_final,
-                    finish_reason=result.finish_reason,
-                    order_seed=order_seed,
+                    attempt_idx=attempt_idx, total_attempts=attempt_idx + 1,
+                    first_attempt_outcome=first_attempt_outcome or "ok",
+                    used_attempt_idx=attempt_idx, attempts=attempt_idx,
+                    is_result=True, finish_reason=finish_reason,
+                    order_seed=order_seed, resume_pass=resume_pass,
                 )
                 self._log(row)
-                if is_final:
-                    return row
-                attempts += 1
-                continue
+                return row
 
+    def _replay(
+        self,
+        entry: dict[str, Any],
+        *,
+        claim_id: str,
+        condition: str | None,
+        sample_idx: int,
+        key: str,
+        user_prompt_sha256: str,
+        escapes: list[dict[str, str]],
+        order_seed: int | None,
+        resume_pass: int,
+    ) -> dict[str, Any]:
+        raw = entry.get("raw")
+        try:
+            parsed = parse_response(raw)
             outcome = "ok"
-            if first_attempt_outcome is None:
-                first_attempt_outcome = outcome
-            entry = {
-                "parsed": parsed,
-                "raw": result.text,
-                "input_tokens": result.input_tokens,
-                "output_tokens": result.output_tokens,
-                "latency_ms": result.latency_ms,
-                "finish_reason": result.finish_reason,
-                "attempt_idx": attempt_idx,
-                "total_attempts": attempt_idx + 1,
-                "first_attempt_outcome": first_attempt_outcome,
-                "attempts": attempts,
-            }
-            with self._lock:
-                self._cache[key] = entry
-                if self.cache_dir is not None:
-                    self._disk_store(key, entry)
-            row = self._row(
-                claim_id=claim_id,
-                condition=condition,
-                sample_idx=sample_idx,
-                user_prompt_sha256=user_prompt_sha256,
-                escapes=escapes,
-                outcome=outcome,
-                raw_response=result.text,
-                parsed=parsed,
-                input_tokens=result.input_tokens,
-                output_tokens=result.output_tokens,
-                latency_ms=result.latency_ms,
-                attempt_idx=attempt_idx,
-                total_attempts=attempt_idx + 1,
-                first_attempt_outcome=first_attempt_outcome,
-                used_attempt_idx=attempt_idx,
-                cached=False,
-                attempts=attempts,
-                is_result=True,
-                finish_reason=result.finish_reason,
-                order_seed=order_seed,
-            )
-            self._log(row)
-            return row
+            error = None
+        except ParseError as exc:
+            parsed = None
+            outcome = "parse_failure"
+            error = str(exc)
+        row = self._row(
+            claim_id=claim_id, condition=condition, sample_idx=sample_idx,
+            cache_key=key, user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+            outcome=outcome, raw_response=raw, parsed=parsed,
+            input_tokens=entry.get("input_tokens"),
+            output_tokens=entry.get("output_tokens"),
+            latency_ms=entry.get("latency_ms"),
+            attempt_idx=entry.get("attempt_idx", 0),
+            total_attempts=entry.get("total_attempts", 1),
+            first_attempt_outcome=entry.get("first_attempt_outcome"),
+            used_attempt_idx=entry.get("attempt_idx"),
+            cached=True, attempts=entry.get("attempts", 0),
+            is_result=False, finish_reason=entry.get("finish_reason"),
+            order_seed=order_seed, resume_pass=resume_pass, error=error,
+        )
+        self._log(row)
+        return row
 
     def run_batch(
-        self, items: list[dict[str, Any]], order_seed: Any
+        self,
+        items: list[dict[str, Any]],
+        order_seed: int,
+        resume_passes: int = 2,
     ) -> list[dict[str, Any]]:
-        """Run verify() calls in a seeded shuffle, logging order_seed in every row.
+        """Run verify() calls in a seeded shuffle with crash-resume support."""
+        if isinstance(order_seed, bool) or not isinstance(order_seed, int):
+            raise TypeError("order_seed must be an int")
+        if resume_passes < 0:
+            raise ValueError("resume_passes must be >= 0")
 
-        The shuffle spans all conditions in ``items``; passing the same seed
-        reproduces the same execution order.
-        """
         ordered = [dict(item) for item in items]
+        ordered.sort(key=lambda item: (
+            str(item.get("claim_id")),
+            str(item.get("condition")),
+            int(item.get("sample_idx", 0)),
+        ))
         random.Random(order_seed).shuffle(ordered)
-        with ThreadPoolExecutor(max_workers=self.config.concurrency) as pool:
-            futures = [
-                pool.submit(self.verify, **{**item, "order_seed": order_seed})
-                for item in ordered
-            ]
-            return [future.result() for future in futures]
+
+        done = self._finished_keys()
+        ordered = [
+            item for item in ordered
+            if (
+                str(item.get("claim_id")),
+                item.get("condition"),
+                int(item.get("sample_idx", 0)),
+            )
+            not in done
+        ]
+
+        rows: list[dict[str, Any]] = []
+        last_pass = resume_passes == 0
+        for item in ordered:
+            rows.append(
+                self.verify(**item, order_seed=order_seed, resume_pass=0, is_last_pass=last_pass)
+            )
+
+        for pass_index in range(1, resume_passes + 1):
+            failing = [item for item, row in zip(ordered, rows) if row["outcome"] == "api_error"]
+            if not failing:
+                break
+            final = pass_index == resume_passes
+            new_rows = []
+            for item in failing:
+                new_rows.append(
+                    self.verify(**item, order_seed=order_seed,
+                                resume_pass=pass_index, is_last_pass=final)
+                )
+            rows = [row for row in rows if row["outcome"] != "api_error"] + new_rows
+        return rows
+
+    def _finished_keys(self) -> set[tuple[str, str | None, int]]:
+        done: set[tuple[str, str | None, int]] = set()
+        if not self.log_path.is_file():
+            return done
+        with self.log_path.open(encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    continue
+                if row.get("is_result"):
+                    done.add(
+                        (
+                            str(row.get("claim_id")),
+                            row.get("condition"),
+                            int(row.get("sample_idx", 0)),
+                        )
+                    )
+        return done

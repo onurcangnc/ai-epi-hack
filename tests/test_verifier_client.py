@@ -123,9 +123,10 @@ def test_parse_fenced():
     assert parse_response(f"```json\n{VALID}\n```")["verdict"] == "SUPPORTED"
 
 
-def test_parse_extra_fields_ignored():
+def test_parse_extra_fields_rejected():
     raw = '{"verdict": "REFUTED", "confidence": 10, "rationale": "r", "evidence_concerns": [], "extra": 1}'
-    assert parse_response(raw)["verdict"] == "REFUTED"
+    with pytest.raises(ParseError, match="unexpected field"):
+        parse_response(raw)
 
 
 def test_parse_missing_field():
@@ -329,12 +330,14 @@ def test_unknown_retry_on_rejected():
 # --------------------------------------------------------------------------- #
 # finish_reason
 # --------------------------------------------------------------------------- #
-def test_length_finish_reason_visible_on_result(tmp_path):
+def test_length_finish_reason_is_truncated_even_with_complete_json(tmp_path):
     client, _, _ = make_client(tmp_path, [(VALID, "length")])
     row = call(client)
-    assert row["outcome"] == "ok"
+    assert row["outcome"] == "truncated"
+    assert row["verdict"] is None
     assert row["finish_reason"] == "length"
     assert row["finish_reason_last"] == "length"
+    assert row["raw_response"] == VALID
 
 
 def test_absent_finish_reason_is_null(tmp_path):
@@ -345,11 +348,12 @@ def test_absent_finish_reason_is_null(tmp_path):
 
 
 def test_cached_row_keeps_finish_reason(tmp_path):
-    client, backend, _ = make_client(tmp_path, [(VALID, "length")])
+    client, backend, _ = make_client(tmp_path, [(VALID, "stop")])
     call(client)
     cached = call(client)
     assert cached["cached"] is True
-    assert cached["finish_reason_last"] == "length"
+    assert cached["finish_reason_last"] == "stop"
+    assert cached["outcome"] == "ok"
     assert len(backend.calls) == 1
 
 

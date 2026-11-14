@@ -44,8 +44,6 @@ def run_phase(config, phase: str, temperature: float) -> dict:
     )
     prompts = load_prompts(ROOT / "prompts")
     log_path = RAW / f"{phase}.jsonl"
-    if log_path.exists():
-        log_path.unlink()
     client = VerifierClient(cfg, backend, prompts, log_path, cache_dir=CACHE)
 
     started = time.monotonic()

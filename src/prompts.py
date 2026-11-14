@@ -1,13 +1,15 @@
 """Loading and rendering of the frozen verifier prompts.
 
 The prompts are human-owned artifacts: this module never edits them. It only
-reads bytes, hashes them, and fills the user template with ``str.replace``.
-``str.format`` must not be used: the system prompt contains literal braces.
+reads bytes, hashes them, and fills the user template. Substitution is a single
+pass over the template, so a ``{evidence}`` sequence inside the claim text is
+never substituted a second time.
 """
 
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -15,9 +17,11 @@ from typing import Any, Iterable
 SYSTEM_FILENAME = "verifier_system.txt"
 USER_FILENAME = "verifier_user.txt"
 
+_PLACEHOLDER = re.compile(r"\{(claim|evidence)\}")
+
 
 class PromptError(ValueError):
-    """Raised when a required prompt file is missing or unreadable."""
+    """Raised when a required prompt file is missing, unreadable or unfillable."""
 
 
 @dataclass(frozen=True)
@@ -51,15 +55,26 @@ def load_prompts(prompt_dir: Path) -> PromptBundle:
 
 
 def render_user(template: str, claim: str, evidence: str) -> str:
-    """Fill the user template with placeholders; never use str.format."""
-    return template.replace("{claim}", claim).replace("{evidence}", evidence)
+    """Fill the user template with placeholders in a single pass."""
+    values = {"claim": claim, "evidence": evidence}
+    return _PLACEHOLDER.sub(lambda match: values[match.group(1)], template)
 
 
 def render_evidence(sentences: Iterable[dict[str, Any]]) -> str:
     """Normalise evidence for ALL conditions: strip() each sentence, join with one space.
 
-    This is the single render path for every condition (C0, C0p, C1, C2, M1, M2,
-    ...). Sentence order is preserved; a sentence that is only whitespace
-    collapses to an empty field, exactly as ``strip()`` implies.
+    Every element must be a mapping with a non-blank string ``text``; anything
+    else is a data error rather than silently dropped evidence.
     """
-    return " ".join(str(sentence["text"]).strip() for sentence in sentences)
+    parts: list[str] = []
+    for index, sentence in enumerate(sentences):
+        text = sentence.get("text") if isinstance(sentence, dict) else None
+        if not isinstance(text, str):
+            raise PromptError(
+                f"evidence sentence {index} has no string 'text': {type(text).__name__}"
+            )
+        stripped = text.strip()
+        if not stripped:
+            raise PromptError(f"evidence sentence {index} is blank")
+        parts.append(stripped)
+    return " ".join(parts)

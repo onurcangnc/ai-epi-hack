@@ -2,7 +2,8 @@
 
 Only two things are tolerated beyond a bare JSON object: surrounding
 whitespace and a single ```json fenced block around the whole response.
-Everything else is a parse failure, and a parse failure never becomes a verdict.
+Duplicate keys, missing keys and extra keys are all parse failures, and a parse
+failure never becomes a verdict.
 """
 
 from __future__ import annotations
@@ -23,6 +24,15 @@ REQUIRED_FIELDS = ("verdict", "confidence", "rationale", "evidence_concerns")
 
 class ParseError(ValueError):
     """Raised when a model response is not a valid verifier answer."""
+
+
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ParseError(f"duplicate key: {key!r}")
+        result[key] = value
+    return result
 
 
 def strip_fence(raw: str) -> str:
@@ -49,19 +59,29 @@ def _confidence(value: Any) -> int:
     return number
 
 
-def parse_response(raw: str) -> dict[str, Any]:
+def parse_response(raw: Any) -> dict[str, Any]:
     """Parse and validate one verifier response."""
+    if not isinstance(raw, str):
+        raise ParseError(f"content is not a string: {type(raw).__name__}")
     text = strip_fence(raw)
     try:
-        payload = json.loads(text)
-    except json.JSONDecodeError as exc:
+        payload = json.loads(text, object_pairs_hook=_unique_object)
+    except ParseError:
+        raise
+    except RecursionError as exc:
+        raise ParseError("response nesting is too deep") from exc
+    except ValueError as exc:  # includes JSONDecodeError and int-digit limits
         raise ParseError(f"not valid JSON: {exc}") from exc
     if not isinstance(payload, dict):
         raise ParseError(f"expected one JSON object, got {type(payload).__name__}")
 
-    missing = [field for field in REQUIRED_FIELDS if field not in payload]
+    keys = set(payload)
+    missing = [field for field in REQUIRED_FIELDS if field not in keys]
     if missing:
         raise ParseError(f"missing required field(s): {', '.join(missing)}")
+    extra = sorted(keys - set(REQUIRED_FIELDS))
+    if extra:
+        raise ParseError(f"unexpected field(s): {', '.join(extra)}")
 
     verdict = payload["verdict"]
     if not isinstance(verdict, str) or verdict not in VERDICTS:

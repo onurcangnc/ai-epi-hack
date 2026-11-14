@@ -42,9 +42,10 @@ pilot:
 smoke:
   seed: 20261115
 
-# Persistent response cache (SPEC §7). Relative paths resolve against this file.
+# Persistent response cache (SPEC §7). Outside OneDrive so sync does not
+# corrupt in-flight writes; created on demand.
 cache:
-  dir: cache
+  dir: C:/Users/rekal/AppData/Local/epistemics-eval/cache
 
 # Main subject (SPEC §3). Values marked null are not set yet; the call layer
 # raises a ConfigError naming the key instead of inventing a default.
@@ -60,7 +61,8 @@ models:
       enabled: false
       budget_tokens: null
     concurrency: 4       # operational default, not a scientific setting; change freely
-    max_retries: 2
+    # 5 attempts = 4 retries, per SPEC v1.1 (exponential backoff, 60 s cap).
+    max_retries: 4
     # Retry policy (SPEC v1.1): only listed outcomes are retried. The main run
     # retries API errors only; a parse failure is an outcome and is not retried.
     retry_on: [api_error]

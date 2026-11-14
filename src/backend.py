@@ -2,27 +2,53 @@
 
 Only the chat-completions endpoint is used. Errors are translated into the
 small exception hierarchy below so the client can decide what is retryable.
+Auth errors (401/402/403) are separate because they abort a run instead of
+being retried.
 """
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 from typing import Any
 
 import requests
 
+_BEARER = re.compile(r"Bearer\s+\S+", re.IGNORECASE)
+
+
+def redact(text: str) -> str:
+    """Remove any bearer token from text that may reach a log or exception."""
+    return _BEARER.sub("Bearer [REDACTED]", str(text))
+
 
 class BackendError(Exception):
     """Base class for backend failures (non-retryable unless subclassed)."""
 
 
+class AuthError(BackendError):
+    """HTTP 401/402/403: the run must abort, not retry."""
+
+    def __init__(self, status: int, message: str) -> None:
+        super().__init__(redact(message))
+        self.status = status
+
+
 class RateLimitError(BackendError):
-    """HTTP 429."""
+    """HTTP 429, optionally carrying Retry-After seconds."""
+
+    def __init__(self, message: str, retry_after: float | None = None) -> None:
+        super().__init__(redact(message))
+        self.retry_after = retry_after
 
 
 class ServerError(BackendError):
     """HTTP 5xx."""
+
+    def __init__(self, status: int, message: str) -> None:
+        super().__init__(redact(message))
+        self.status = status
 
 
 class BackendTimeout(BackendError):
@@ -31,11 +57,15 @@ class BackendTimeout(BackendError):
 
 @dataclass(frozen=True)
 class BackendResult:
-    text: str
+    text: Any
     input_tokens: int | None
     output_tokens: int | None
     latency_ms: float
     finish_reason: str | None = None
+    http_status: int | None = None
+    model: str | None = None
+    system_fingerprint: str | None = None
+    reasoning_tokens: int | None = None
 
 
 @dataclass(frozen=True)
@@ -48,9 +78,18 @@ class ThinkingConfig:
             "type": "enabled" if self.enabled else "disabled",
         }
         if self.enabled and self.budget_tokens is not None:
-            # Unverified against the live API; probe_api.py is meant to check it.
             payload["budget_tokens"] = self.budget_tokens
         return payload
+
+
+def _retry_after(response: requests.Response) -> float | None:
+    value = response.headers.get("Retry-After")
+    if not value:
+        return None
+    try:
+        return max(0.0, float(value))
+    except (TypeError, ValueError):
+        return None
 
 
 class DeepSeekBackend:
@@ -109,16 +148,21 @@ class DeepSeekBackend:
         except requests.Timeout as exc:
             raise BackendTimeout(f"request timed out after {self.timeout}s") from exc
         except requests.RequestException as exc:
-            raise BackendError(f"request failed: {exc}") from exc
+            raise BackendError(redact(f"request failed: {exc}")) from exc
         latency_ms = (time.monotonic() - started) * 1000.0
 
-        if response.status_code == 429:
-            raise RateLimitError(f"rate limited: {response.text[:500]}")
-        if response.status_code >= 500:
-            raise ServerError(f"server error {response.status_code}: {response.text[:500]}")
-        if response.status_code >= 400:
+        status = response.status_code
+        if status in (401, 402, 403):
+            raise AuthError(status, f"authentication failed {status}: {response.text[:500]}")
+        if status == 429:
+            raise RateLimitError(
+                f"rate limited: {response.text[:500]}", retry_after=_retry_after(response)
+            )
+        if status >= 500:
+            raise ServerError(status, f"server error {status}: {response.text[:500]}")
+        if status >= 400:
             raise BackendError(
-                f"request rejected {response.status_code}: {response.text[:500]}"
+                redact(f"request rejected {status}: {response.text[:500]}")
             )
 
         try:
@@ -126,15 +170,18 @@ class DeepSeekBackend:
             choice = data["choices"][0]
             text = choice["message"]["content"]
         except (ValueError, KeyError, IndexError, TypeError) as exc:
-            raise BackendError(f"malformed API response: {exc}") from exc
+            raise BackendError(redact(f"malformed API response: {exc}")) from exc
 
         usage = data.get("usage") or {}
+        details = usage.get("completion_tokens_details") or {}
         return BackendResult(
             text=text,
             input_tokens=usage.get("prompt_tokens"),
             output_tokens=usage.get("completion_tokens"),
             latency_ms=latency_ms,
-            finish_reason=choice.get("finish_reason")
-            if isinstance(choice, dict)
-            else None,
+            finish_reason=choice.get("finish_reason") if isinstance(choice, dict) else None,
+            http_status=status,
+            model=data.get("model"),
+            system_fingerprint=data.get("system_fingerprint"),
+            reasoning_tokens=details.get("reasoning_tokens"),
         )
