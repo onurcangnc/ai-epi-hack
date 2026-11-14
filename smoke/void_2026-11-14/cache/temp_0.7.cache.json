@@ -1,0 +1,514 @@
+{
+  "phase": "temp_0.7",
+  "temperature": 0.7,
+  "entries": {
+    "ff387bd0946cbea548d1b4b075c8878fafb778c1463d7b4958dd2ae69a461da7": {
+      "parsed": {
+        "verdict": "NOT_ENOUGH_INFO",
+        "confidence": 80,
+        "rationale": "The evidence describes differential innate immune programs and identifies three ISGs (Ifi27, Irg1, Rsad2) mediating antiviral effects in granule cell neurons, but it does not mention rapid up-regulation or higher basal expression of interferon-induced genes, nor does it specifically address West Nile virus or survival outcomes.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"NOT_ENOUGH_INFO\", \"confidence\": 80, \"rationale\": \"The evidence describes differential innate immune programs and identifies three ISGs (Ifi27, Irg1, Rsad2) mediating antiviral effects in granule cell neurons, but it does not mention rapid up-regulation or higher basal expression of interferon-induced genes, nor does it specifically address West Nile virus or survival outcomes.\", \"evidence_concerns\": []}",
+      "input_tokens": 463,
+      "output_tokens": 93,
+      "latency_ms": 1500.0,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "85cfe7d945177c535411e4f6ab2bf4b48ad3b84e26a6cad7fda532ae3b5c5a62": {
+      "parsed": {
+        "verdict": "NOT_ENOUGH_INFO",
+        "confidence": 70,
+        "rationale": "The evidence shows granule cell neurons have distinct innate immune programs and higher expression of certain ISGs that mediate antiviral effects, but it does not address rapid up-regulation of interferon-induced genes or link these mechanisms to increased survival of West Nile virus-infected granule cells.",
+        "evidence_concerns": [
+          "Evidence discusses positive-stranded RNA viruses generally and does not specifically mention West Nile virus",
+          "No data on survival outcomes of infected neurons",
+          "No mention of rapid up-regulation kinetics of ISGs"
+        ]
+      },
+      "raw": "{\"verdict\": \"NOT_ENOUGH_INFO\", \"confidence\": 70, \"rationale\": \"The evidence shows granule cell neurons have distinct innate immune programs and higher expression of certain ISGs that mediate antiviral effects, but it does not address rapid up-regulation of interferon-induced genes or link these mechanisms to increased survival of West Nile virus-infected granule cells.\", \"evidence_concerns\": [\"Evidence discusses positive-stranded RNA viruses generally and does not specifically mention West Nile virus\", \"No data on survival outcomes of infected neurons\", \"No mention of rapid up-regulation kinetics of ISGs\"]}",
+      "input_tokens": 463,
+      "output_tokens": 120,
+      "latency_ms": 1360.000000015134,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "857f7790c25a12dfdb32972d9c1fca04d5cae109c7c486fa4711708965a66e39": {
+      "parsed": {
+        "verdict": "NOT_ENOUGH_INFO",
+        "confidence": 78,
+        "rationale": "The evidence shows granule cell neurons have distinct innate immune programs and higher expression of certain ISGs conferring antiviral effects, but it does not mention rapid up-regulation, basal expression levels specifically linked to survival, or West Nile virus infection outcomes. The claim about increased survival of infected granule cells is not directly tested or stated.",
+        "evidence_concerns": [
+          "Does not name West Nile virus specifically, referring only to positive-stranded RNA viruses and neurotropic viruses",
+          "Does not report survival data for infected granule cell neurons",
+          "Does not address rapid up-regulation kinetics of interferon-induced genes"
+        ]
+      },
+      "raw": "{\"verdict\": \"NOT_ENOUGH_INFO\", \"confidence\": 78, \"rationale\": \"The evidence shows granule cell neurons have distinct innate immune programs and higher expression of certain ISGs conferring antiviral effects, but it does not mention rapid up-regulation, basal expression levels specifically linked to survival, or West Nile virus infection outcomes. The claim about increased survival of infected granule cells is not directly tested or stated.\", \"evidence_concerns\": [\"Does not name West Nile virus specifically, referring only to positive-stranded RNA viruses and neurotropic viruses\", \"Does not report survival data for infected granule cell neurons\", \"Does not address rapid up-regulation kinetics of interferon-induced genes\"]}",
+      "input_tokens": 463,
+      "output_tokens": 142,
+      "latency_ms": 1483.9999999967404,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "c9aa319038613258dad89fab1c27b13beaa62e22096ef3178ade01b0dcae3867": {
+      "parsed": {
+        "verdict": "NOT_ENOUGH_INFO",
+        "confidence": 75,
+        "rationale": "The evidence shows granule cell neurons have distinct innate immune programs and higher expression of specific ISGs (Ifi27, Irg1, Rsad2) conferring antiviral effects, but it does not address rapid up-regulation, basal expression levels generally, or increased survival of West Nile virus-infected granule cells specifically.",
+        "evidence_concerns": [
+          "Evidence discusses 'several positive-stranded RNA viruses' and 'neurotropic viruses' generally, not West Nile virus specifically",
+          "No mention of survival outcomes or rapid up-regulation kinetics"
+        ]
+      },
+      "raw": "{\"verdict\": \"NOT_ENOUGH_INFO\", \"confidence\": 75, \"rationale\": \"The evidence shows granule cell neurons have distinct innate immune programs and higher expression of specific ISGs (Ifi27, Irg1, Rsad2) conferring antiviral effects, but it does not address rapid up-regulation, basal expression levels generally, or increased survival of West Nile virus-infected granule cells specifically.\", \"evidence_concerns\": [\"Evidence discusses 'several positive-stranded RNA viruses' and 'neurotropic viruses' generally, not West Nile virus specifically\", \"No mention of survival outcomes or rapid up-regulation kinetics\"]}",
+      "input_tokens": 463,
+      "output_tokens": 130,
+      "latency_ms": 1405.9999999881256,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "859f51ee7dda5a9c8686726b7894828fbc27dd28966a69a8ecb2a11164ed8d3e": {
+      "parsed": {
+        "verdict": "SUPPORTED",
+        "confidence": 78,
+        "rationale": "The evidence shows granule cell neurons have distinct innate immune programs with higher ISG expression (Ifi27, Irg1, Rsad2) mediating antiviral effects against neurotropic viruses, supporting the claim's core mechanism. However, the abstract does not explicitly mention West Nile virus specifically or 'rapid up-regulation' and 'increased survival' as such, though 'positive-stranded RNA viruses' and 'differential susceptibility' are consistent.",
+        "evidence_concerns": [
+          "Evidence refers to 'several positive-stranded RNA viruses' and 'neurotropic viruses' generally, not West Nile virus specifically",
+          "No explicit statement about 'rapid up-regulation' kinetics or 'survival' of infected neurons is provided"
+        ]
+      },
+      "raw": "{\"verdict\": \"SUPPORTED\", \"confidence\": 78, \"rationale\": \"The evidence shows granule cell neurons have distinct innate immune programs with higher ISG expression (Ifi27, Irg1, Rsad2) mediating antiviral effects against neurotropic viruses, supporting the claim's core mechanism. However, the abstract does not explicitly mention West Nile virus specifically or 'rapid up-regulation' and 'increased survival' as such, though 'positive-stranded RNA viruses' and 'differential susceptibility' are consistent.\", \"evidence_concerns\": [\"Evidence refers to 'several positive-stranded RNA viruses' and 'neurotropic viruses' generally, not West Nile virus specifically\", \"No explicit statement about 'rapid up-regulation' kinetics or 'survival' of infected neurons is provided\"]}",
+      "input_tokens": 463,
+      "output_tokens": 166,
+      "latency_ms": 1812.999999994645,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "b6d12bbc04d62a4fb75510ade0bdfbfac5317af796229d075b373fec36a4e43e": {
+      "parsed": {
+        "verdict": "SUPPORTED",
+        "confidence": 90,
+        "rationale": "The evidence explicitly states that the mechanism controlling cortical size (progenitor expansion/output) is regulated cell autonomously in culture, directly matching the claim about progenitors' proliferative capacity.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"SUPPORTED\", \"confidence\": 90, \"rationale\": \"The evidence explicitly states that the mechanism controlling cortical size (progenitor expansion/output) is regulated cell autonomously in culture, directly matching the claim about progenitors' proliferative capacity.\", \"evidence_concerns\": []}",
+      "input_tokens": 425,
+      "output_tokens": 65,
+      "latency_ms": 1156.0000000172295,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "81d667fffd5d4b58413a732ff01db45c8496cdc2b04758a541fd5c9f143dc9b9": {
+      "parsed": {
+        "verdict": "SUPPORTED",
+        "confidence": 85,
+        "rationale": "The evidence explicitly states that the mechanism controlling cortical progenitor expansion and output is regulated cell autonomously in culture, directly supporting the claim. This cell-autonomous regulation is described in the context of progenitor proliferative capacity.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"SUPPORTED\", \"confidence\": 85, \"rationale\": \"The evidence explicitly states that the mechanism controlling cortical progenitor expansion and output is regulated cell autonomously in culture, directly supporting the claim. This cell-autonomous regulation is described in the context of progenitor proliferative capacity.\", \"evidence_concerns\": []}",
+      "input_tokens": 425,
+      "output_tokens": 70,
+      "latency_ms": 828.0000000086147,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "87a9c7c74f1efd9493234fa1adb365bc0b4d26e128c9e983853957ab910b5875": {
+      "parsed": {
+        "verdict": "SUPPORTED",
+        "confidence": 88,
+        "rationale": "The evidence explicitly states that the mechanism controlling cortical size via progenitor expansion is regulated cell autonomously in culture, directly matching the claim.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"SUPPORTED\", \"confidence\": 88, \"rationale\": \"The evidence explicitly states that the mechanism controlling cortical size via progenitor expansion is regulated cell autonomously in culture, directly matching the claim.\", \"evidence_concerns\": []}",
+      "input_tokens": 425,
+      "output_tokens": 54,
+      "latency_ms": 1234.9999999860302,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "b8cd7e1376070337a13a7a27b2d8c8b7a2a9912f76a9352f4d8b797a038f6758": {
+      "parsed": {
+        "verdict": "SUPPORTED",
+        "confidence": 88,
+        "rationale": "The evidence explicitly states that the mechanism controlling cortical size, via progenitor expansion and neuron output, is regulated cell autonomously in culture, matching the claim.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"SUPPORTED\", \"confidence\": 88, \"rationale\": \"The evidence explicitly states that the mechanism controlling cortical size, via progenitor expansion and neuron output, is regulated cell autonomously in culture, matching the claim.\", \"evidence_concerns\": []}",
+      "input_tokens": 425,
+      "output_tokens": 58,
+      "latency_ms": 1140.0000000139698,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "735c27609312878c43dc752adb08bfaadf0aa9de8469cb6e7c23e789fe603d52": {
+      "parsed": {
+        "verdict": "SUPPORTED",
+        "confidence": 88,
+        "rationale": "The evidence explicitly states that the mechanism controlling cortical size (progenitor expansion/neuron output) is regulated cell autonomously in culture, directly supporting the claim about cell-autonomous regulation of progenitor proliferative capacity.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"SUPPORTED\", \"confidence\": 88, \"rationale\": \"The evidence explicitly states that the mechanism controlling cortical size (progenitor expansion/neuron output) is regulated cell autonomously in culture, directly supporting the claim about cell-autonomous regulation of progenitor proliferative capacity.\", \"evidence_concerns\": []}",
+      "input_tokens": 425,
+      "output_tokens": 71,
+      "latency_ms": 1000.0,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "74dbac82df89740a15af37c14ddda29e388469764ce9e711b1f0fa9edda061e9": {
+      "parsed": {
+        "verdict": "REFUTED",
+        "confidence": 90,
+        "rationale": "The evidence states that triggering PD-1 on monocytes by PD-L1 induced IL-10 production, which is the opposite of the claim that PD-1 triggering reduces IL-10 production.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"REFUTED\", \"confidence\": 90, \"rationale\": \"The evidence states that triggering PD-1 on monocytes by PD-L1 induced IL-10 production, which is the opposite of the claim that PD-1 triggering reduces IL-10 production.\", \"evidence_concerns\": []}",
+      "input_tokens": 478,
+      "output_tokens": 66,
+      "latency_ms": 921.9999999913853,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "1208376738ec26e98ba5838847a12c19b4cac15454d9dd89c2ff5575e9a4c3e8": {
+      "parsed": {
+        "verdict": "REFUTED",
+        "confidence": 92,
+        "rationale": "The evidence states that triggering PD-1 on monocytes by PD-L1 induced IL-10 production, i.e., increased rather than reduced IL-10 production by monocytes.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"REFUTED\", \"confidence\": 92, \"rationale\": \"The evidence states that triggering PD-1 on monocytes by PD-L1 induced IL-10 production, i.e., increased rather than reduced IL-10 production by monocytes.\", \"evidence_concerns\": []}",
+      "input_tokens": 478,
+      "output_tokens": 62,
+      "latency_ms": 1030.9999999881256,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "c0bb38a08e6594c6aaad5a7864ee8c4814f7ef3fef1cfdde44f9379dc2e63e03": {
+      "parsed": {
+        "verdict": "REFUTED",
+        "confidence": 90,
+        "rationale": "The evidence states that PD-1 triggering on monocytes induced IL-10 production, i.e., increased rather than reduced IL-10, directly contradicting the claim.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"REFUTED\", \"confidence\": 90, \"rationale\": \"The evidence states that PD-1 triggering on monocytes induced IL-10 production, i.e., increased rather than reduced IL-10, directly contradicting the claim.\", \"evidence_concerns\": []}",
+      "input_tokens": 478,
+      "output_tokens": 61,
+      "latency_ms": 1360.000000015134,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "fe28dfd9810141be4063d0afd4e354954e182455bf1287ece5c8f4422b3975b5": {
+      "parsed": {
+        "verdict": "REFUTED",
+        "confidence": 90,
+        "rationale": "The evidence states that triggering PD-1 on monocytes by PD-L1 induced IL-10 production, which is the opposite of the claim that PD-1 triggering reduces IL-10 production.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"REFUTED\", \"confidence\": 90, \"rationale\": \"The evidence states that triggering PD-1 on monocytes by PD-L1 induced IL-10 production, which is the opposite of the claim that PD-1 triggering reduces IL-10 production.\", \"evidence_concerns\": []}",
+      "input_tokens": 478,
+      "output_tokens": 66,
+      "latency_ms": 1296.9999999913853,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "dafe31ae62e4e7428df21b3586ee6de9e44183939a83136e6633e903ed4c4f41": {
+      "parsed": {
+        "verdict": "REFUTED",
+        "confidence": 92,
+        "rationale": "The evidence explicitly states that PD-1 triggering on monocytes induced IL-10 production, the opposite of the claim that it reduces IL-10 production.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"REFUTED\", \"confidence\": 92, \"rationale\": \"The evidence explicitly states that PD-1 triggering on monocytes induced IL-10 production, the opposite of the claim that it reduces IL-10 production.\", \"evidence_concerns\": []}",
+      "input_tokens": 478,
+      "output_tokens": 58,
+      "latency_ms": 1187.000000005355,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "d99c6b17d7f27854dc4ac40dfaa9a096f5e57a5f324445bba347493226acf2e5": {
+      "parsed": {
+        "verdict": "REFUTED",
+        "confidence": 88,
+        "rationale": "The evidence indicates that increased erythrocyte count and microcytosis (as in alpha(+)-thalassaemia homozygosity) confer protection against severe malarial anaemia, reducing risk (RR 0.52), the opposite of the claim that such patients are more vulnerable.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"REFUTED\", \"confidence\": 88, \"rationale\": \"The evidence indicates that increased erythrocyte count and microcytosis (as in alpha(+)-thalassaemia homozygosity) confer protection against severe malarial anaemia, reducing risk (RR 0.52), the opposite of the claim that such patients are more vulnerable.\", \"evidence_concerns\": []}",
+      "input_tokens": 808,
+      "output_tokens": 83,
+      "latency_ms": 1375.0,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "76c78a8cbdc0d939b37700bc2f1792740f216d4fb4bc1971beec9e1bcc85e607": {
+      "parsed": {
+        "verdict": "REFUTED",
+        "confidence": 88,
+        "rationale": "The evidence indicates that microcytosis with increased erythrocyte count (alpha(+)-thalassaemia homozygosity) confers protection against severe malarial anaemia, reducing risk (RR 0.52), not increasing vulnerability as the claim states.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"REFUTED\", \"confidence\": 88, \"rationale\": \"The evidence indicates that microcytosis with increased erythrocyte count (alpha(+)-thalassaemia homozygosity) confers protection against severe malarial anaemia, reducing risk (RR 0.52), not increasing vulnerability as the claim states.\", \"evidence_concerns\": []}",
+      "input_tokens": 808,
+      "output_tokens": 77,
+      "latency_ms": 1030.9999999881256,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "d26af322f7bb3247117a36583602403fac0281c5b7254a1d251d07c9ba27036b": {
+      "parsed": {
+        "verdict": "REFUTED",
+        "confidence": 88,
+        "rationale": "The evidence shows that microcytosis with increased erythrocyte count (alpha(+)-thalassaemia homozygosity) confers protection against severe malarial anaemia (RR 0.52), rather than making patients more vulnerable as the claim states.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"REFUTED\", \"confidence\": 88, \"rationale\": \"The evidence shows that microcytosis with increased erythrocyte count (alpha(+)-thalassaemia homozygosity) confers protection against severe malarial anaemia (RR 0.52), rather than making patients more vulnerable as the claim states.\", \"evidence_concerns\": []}",
+      "input_tokens": 808,
+      "output_tokens": 77,
+      "latency_ms": 1172.000000020489,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "d5ccc1ffff1344917952857a2117bb2f48559c88b6c129c0e0e17d2a4ea3761b": {
+      "parsed": {
+        "verdict": "REFUTED",
+        "confidence": 88,
+        "rationale": "The evidence states that microcytosis and increased erythrocyte count (as in alpha(+)-thalassaemia homozygosity) confer protection against severe malarial anaemia, reducing risk (RR 0.52), the opposite of the claim that such patients are more vulnerable.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"REFUTED\", \"confidence\": 88, \"rationale\": \"The evidence states that microcytosis and increased erythrocyte count (as in alpha(+)-thalassaemia homozygosity) confer protection against severe malarial anaemia, reducing risk (RR 0.52), the opposite of the claim that such patients are more vulnerable.\", \"evidence_concerns\": []}",
+      "input_tokens": 808,
+      "output_tokens": 83,
+      "latency_ms": 1155.9999999881256,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "9a5aa9d6fbd7facbc9e9dbeb87c516c29e04f09854c7db10b6b306a28ce26ce9": {
+      "parsed": {
+        "verdict": "REFUTED",
+        "confidence": 85,
+        "rationale": "The evidence indicates that microcytosis with increased erythrocyte count (as in alpha(+)-thalassaemia homozygosity) confers protection against severe malarial anaemia, reducing risk (RR 0.52), which directly contradicts the claim that such patients are more vulnerable.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"REFUTED\", \"confidence\": 85, \"rationale\": \"The evidence indicates that microcytosis with increased erythrocyte count (as in alpha(+)-thalassaemia homozygosity) confers protection against severe malarial anaemia, reducing risk (RR 0.52), which directly contradicts the claim that such patients are more vulnerable.\", \"evidence_concerns\": []}",
+      "input_tokens": 808,
+      "output_tokens": 83,
+      "latency_ms": 1296.9999999913853,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "acff547d3954b1ec627cba084b14391a10d0c8824871a87cb25ae83a9b8ab610": {
+      "parsed": {
+        "verdict": "NOT_ENOUGH_INFO",
+        "confidence": 92,
+        "rationale": "The evidence discusses LPS-induced alternative inflammasome activation in human monocytes and pyroptosome formation generally, but never mentions M. stadtmanae or BlaER1 monocytes, so it cannot confirm or refute the specific claim.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"NOT_ENOUGH_INFO\", \"confidence\": 92, \"rationale\": \"The evidence discusses LPS-induced alternative inflammasome activation in human monocytes and pyroptosome formation generally, but never mentions M. stadtmanae or BlaER1 monocytes, so it cannot confirm or refute the specific claim.\", \"evidence_concerns\": []}",
+      "input_tokens": 489,
+      "output_tokens": 75,
+      "latency_ms": 782.0000000065193,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "8cf7542f5e182162427b2daadfa385a496b41ee39f4b56388f2301b63ea559f0": {
+      "parsed": {
+        "verdict": "NOT_ENOUGH_INFO",
+        "confidence": 85,
+        "rationale": "The evidence discusses a species-specific alternative inflammasome in human monocytes but never mentions M. stadtmanae, BlaER1 cells, or ASC speck formation, so it cannot confirm or refute the claim.",
+        "evidence_concerns": [
+          "Evidence is an abstract about LPS-induced alternative inflammasome activation and does not address M. stadtmanae or BlaER1 monocytes",
+          "No mention of ASC speck/pyroptosome formation in the specific experimental context of the claim"
+        ]
+      },
+      "raw": "{\"verdict\": \"NOT_ENOUGH_INFO\", \"confidence\": 85, \"rationale\": \"The evidence discusses a species-specific alternative inflammasome in human monocytes but never mentions M. stadtmanae, BlaER1 cells, or ASC speck formation, so it cannot confirm or refute the claim.\", \"evidence_concerns\": [\"Evidence is an abstract about LPS-induced alternative inflammasome activation and does not address M. stadtmanae or BlaER1 monocytes\", \"No mention of ASC speck/pyroptosome formation in the specific experimental context of the claim\"]}",
+      "input_tokens": 489,
+      "output_tokens": 120,
+      "latency_ms": 1453.0000000086147,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "37193ba9dfbc458dbaa8140cb7886850ae97d03826a8f0af3499973ff32f4adc": {
+      "parsed": {
+        "verdict": "NOT_ENOUGH_INFO",
+        "confidence": 90,
+        "rationale": "The evidence discusses a species-specific alternative inflammasome in human monocytes and states it is devoid of pyroptosome formation, but it never mentions M. stadtmanae, BlaER1 monocytes, or ASC speck formation specifically in that context.",
+        "evidence_concerns": [
+          "Evidence does not mention M. stadtmanae, BlaER1 cells, or ASC speck formation directly",
+          "Evidence appears to be an abstract about LPS-induced alternative inflammasome activation, not the claim's specific experiment"
+        ]
+      },
+      "raw": "{\"verdict\": \"NOT_ENOUGH_INFO\", \"confidence\": 90, \"rationale\": \"The evidence discusses a species-specific alternative inflammasome in human monocytes and states it is devoid of pyroptosome formation, but it never mentions M. stadtmanae, BlaER1 monocytes, or ASC speck formation specifically in that context.\", \"evidence_concerns\": [\"Evidence does not mention M. stadtmanae, BlaER1 cells, or ASC speck formation directly\", \"Evidence appears to be an abstract about LPS-induced alternative inflammasome activation, not the claim's specific experiment\"]}",
+      "input_tokens": 489,
+      "output_tokens": 122,
+      "latency_ms": 1592.9999999934807,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "7eec2aba86fdc53d2e25751cdf26ff3cf192a5e500036cc261c52edc1102b007": {
+      "parsed": {
+        "verdict": "NOT_ENOUGH_INFO",
+        "confidence": 85,
+        "rationale": "The evidence discusses a species-specific alternative inflammasome in human monocytes but never mentions M. stadtmanae, BlaER1 monocytes, or ASC speck formation, so it cannot confirm or refute the claim.",
+        "evidence_concerns": [
+          "Evidence is about LPS-induced alternative inflammasome in human monocytes and does not address M. stadtmanae or BlaER1 cells",
+          "No mention of ASC speck formation or specific monocyte lines relevant to the claim"
+        ]
+      },
+      "raw": "{\"verdict\": \"NOT_ENOUGH_INFO\", \"confidence\": 85, \"rationale\": \"The evidence discusses a species-specific alternative inflammasome in human monocytes but never mentions M. stadtmanae, BlaER1 monocytes, or ASC speck formation, so it cannot confirm or refute the claim.\", \"evidence_concerns\": [\"Evidence is about LPS-induced alternative inflammasome in human monocytes and does not address M. stadtmanae or BlaER1 cells\", \"No mention of ASC speck formation or specific monocyte lines relevant to the claim\"]}",
+      "input_tokens": 489,
+      "output_tokens": 116,
+      "latency_ms": 1609.9999999860302,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "7e5e77bfea42fa4fd88a004db28b602a9d4c2a854d2f063f8e3c1f6064e1096e": {
+      "parsed": {
+        "verdict": "NOT_ENOUGH_INFO",
+        "confidence": 85,
+        "rationale": "The evidence describes a species-specific alternative inflammasome in human monocytes that lacks classical characteristics, but it never mentions M. stadtmanae, BlaER1 monocytes, or ASC speck formation, so the specific claim cannot be evaluated.",
+        "evidence_concerns": [
+          "Evidence does not mention M. stadtmanae or BlaER1 monocytes",
+          "Evidence does not address ASC speck formation directly"
+        ]
+      },
+      "raw": "{\"verdict\": \"NOT_ENOUGH_INFO\", \"confidence\": 85, \"rationale\": \"The evidence describes a species-specific alternative inflammasome in human monocytes that lacks classical characteristics, but it never mentions M. stadtmanae, BlaER1 monocytes, or ASC speck formation, so the specific claim cannot be evaluated.\", \"evidence_concerns\": [\"Evidence does not mention M. stadtmanae or BlaER1 monocytes\", \"Evidence does not address ASC speck formation directly\"]}",
+      "input_tokens": 489,
+      "output_tokens": 102,
+      "latency_ms": 937.0000000053551,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "b9a1a27933e557e4836765101cbe0213e26dcc7d184ef91df0ec83e35076eb4f": {
+      "parsed": {
+        "verdict": "NOT_ENOUGH_INFO",
+        "confidence": 78,
+        "rationale": "The evidence describes a uPAR/αvβ3 integrin mechanism by which LPS causes podocyte dysfunction and proteinuria, but it never addresses whether the effect depends on inflammation levels.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"NOT_ENOUGH_INFO\", \"confidence\": 78, \"rationale\": \"The evidence describes a uPAR/αvβ3 integrin mechanism by which LPS causes podocyte dysfunction and proteinuria, but it never addresses whether the effect depends on inflammation levels.\", \"evidence_concerns\": []}",
+      "input_tokens": 475,
+      "output_tokens": 67,
+      "latency_ms": 1297.000000020489,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "dcdeb98d01b80962c343e487ee38478feefe9f1b5bff5995ca62a777afdce671": {
+      "parsed": {
+        "verdict": "NOT_ENOUGH_INFO",
+        "confidence": 78,
+        "rationale": "The evidence describes a uPAR/αvβ3 integrin mechanism by which LPS causes podocyte dysfunction and proteinuria, but it never measures or varies inflammation levels, so it cannot confirm that the LPS effect is dependent on inflammation levels.",
+        "evidence_concerns": [
+          "Evidence discusses LPS-mediated proteinuria via uPAR/integrin signaling but does not address inflammation levels as a modulating variable"
+        ]
+      },
+      "raw": "{\"verdict\": \"NOT_ENOUGH_INFO\", \"confidence\": 78, \"rationale\": \"The evidence describes a uPAR/αvβ3 integrin mechanism by which LPS causes podocyte dysfunction and proteinuria, but it never measures or varies inflammation levels, so it cannot confirm that the LPS effect is dependent on inflammation levels.\", \"evidence_concerns\": [\"Evidence discusses LPS-mediated proteinuria via uPAR/integrin signaling but does not address inflammation levels as a modulating variable\"]}",
+      "input_tokens": 475,
+      "output_tokens": 103,
+      "latency_ms": 1469.0000000118744,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "51c0b73d3a82ae78b09ab4bc28bdf8dbec164012df8788d7517e79f0aa0c7792": {
+      "parsed": {
+        "verdict": "NOT_ENOUGH_INFO",
+        "confidence": 80,
+        "rationale": "The evidence describes how LPS induces proteinuria via uPAR/αvβ3 integrin signaling in podocytes but says nothing about whether this effect depends on inflammation levels.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"NOT_ENOUGH_INFO\", \"confidence\": 80, \"rationale\": \"The evidence describes how LPS induces proteinuria via uPAR/αvβ3 integrin signaling in podocytes but says nothing about whether this effect depends on inflammation levels.\", \"evidence_concerns\": []}",
+      "input_tokens": 475,
+      "output_tokens": 64,
+      "latency_ms": 1015.0000000139698,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "b2f2ef1a25543df34ba836886ece0b1728948266fc368bc53fc5290b4110226e": {
+      "parsed": {
+        "verdict": "NOT_ENOUGH_INFO",
+        "confidence": 82,
+        "rationale": "The evidence describes a uPAR/αvβ3 integrin mechanism by which LPS causes podocyte dysfunction and proteinuria, but it never measures or manipulates inflammation levels, so it cannot establish that the effect is dependent on inflammation levels.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"NOT_ENOUGH_INFO\", \"confidence\": 82, \"rationale\": \"The evidence describes a uPAR/αvβ3 integrin mechanism by which LPS causes podocyte dysfunction and proteinuria, but it never measures or manipulates inflammation levels, so it cannot establish that the effect is dependent on inflammation levels.\", \"evidence_concerns\": []}",
+      "input_tokens": 475,
+      "output_tokens": 78,
+      "latency_ms": 1171.9999999913853,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    },
+    "a093b8c75a16ba31551f086bad9d804516f5844599d393812de2752957faaee8": {
+      "parsed": {
+        "verdict": "NOT_ENOUGH_INFO",
+        "confidence": 85,
+        "rationale": "The evidence describes how LPS causes proteinuria via uPAR/αvβ3 integrin signaling in podocytes, but never mentions inflammation levels or shows that the effect depends on them.",
+        "evidence_concerns": []
+      },
+      "raw": "{\"verdict\": \"NOT_ENOUGH_INFO\", \"confidence\": 85, \"rationale\": \"The evidence describes how LPS causes proteinuria via uPAR/αvβ3 integrin signaling in podocytes, but never mentions inflammation levels or shows that the effect depends on them.\", \"evidence_concerns\": []}",
+      "input_tokens": 475,
+      "output_tokens": 67,
+      "latency_ms": 1093.9999999827705,
+      "attempt_idx": 0,
+      "total_attempts": 1,
+      "first_attempt_outcome": "ok",
+      "attempts": 0
+    }
+  }
+}

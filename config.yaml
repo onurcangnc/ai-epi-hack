@@ -37,6 +37,11 @@ pilot:
   seed: 20261114
   per_class: 10
 
+# Smoke test (TASK A2): sampling check on 6 claims disjoint from the main 150.
+# Separate seed key, so the main 150 and the pilot draw are untouched.
+smoke:
+  seed: 20261115
+
 # Main subject (SPEC §3). Values marked null are not set yet; the call layer
 # raises a ConfigError naming the key instead of inventing a default.
 models:
@@ -46,7 +51,7 @@ models:
     api_key_env: DEEPSEEK_API_KEY
     temperature: 0.7
     top_p: null
-    max_tokens: null
+    max_tokens: 512
     thinking:
       enabled: false
       budget_tokens: null

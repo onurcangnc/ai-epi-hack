@@ -1,0 +1,24 @@
+{
+  "temp_0.7": {
+    "http_calls": 30,
+    "ok_calls": 30,
+    "input": 15690,
+    "output": 2599,
+    "total": 18289,
+    "finish": {
+      "stop": 30
+    },
+    "elapsed_s": 37.2
+  },
+  "temp_1.0": {
+    "http_calls": 30,
+    "ok_calls": 30,
+    "input": 15690,
+    "output": 2490,
+    "total": 18180,
+    "finish": {
+      "stop": 30
+    },
+    "elapsed_s": 35.6
+  }
+}

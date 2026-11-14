@@ -130,8 +130,10 @@ Generator note (M3-M5): unchanged.
 - Opaque ids, shuffled run order, fixed seeds, results cached by hash of (model, config, prompt).
 - Raw responses, prompts, frozen generated data and configs are hashed and kept.
 - A change to this spec after results exist is logged in CHANGELOG.md with the reason.
-- A "result" is any output from any subject model, pilot included. Before the first result, section
-  5, section 6, config.yaml and the analysis scripts are hashed and committed (tag spec-frozen).
+- A "result" is any output from any subject model, pilot included, except infrastructure checks.
+  A check qualifies as infrastructure only if its prompts contain no dataset claim or evidence text;
+  such checks are not results and informed no analysis choice. Before the first result, section 5,
+  section 6, config.yaml and the analysis scripts are hashed and committed (tag spec-frozen).
   Later changes produce a separate analysis labeled exploratory; the frozen analysis stays primary.
 - The first complete row per (claim, condition, sample_idx) is the result; later rows are replications.
 - Main run: parse failures are NOT retried (they are an outcome); API errors are retried.

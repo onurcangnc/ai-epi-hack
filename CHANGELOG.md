@@ -1,8 +1,84 @@
 # CHANGELOG
 
-Changes to `SPEC.md` are recorded here with their reason, per SPEC §7. No
-experiment results existed at the time of the change below; only the Task 1
-data files.
+Changes to `SPEC.md` are recorded here with their reason, per SPEC §7. The §3/§7
+changes below were made before any experiment result existed; the TASK A2 entry
+above is the first result and records that ordering.
+
+## 2026-11-14 — TASK A2 smoke run executed before `spec-frozen` (VOID; re-run after Task B)
+
+**Status: VOID.** At the human's direction (void existing run, re-run after Task B), these 60
+calls are not the official smoke result. All artifacts are preserved for audit under
+`smoke/void_2026-11-14/` (`raw/`, `cache/`, `report.md`, `run_stats.json`). The official run must
+be executed only after Task B is merged and committed, using `smoke/claims.jsonl` and the
+settings below; it will write fresh `smoke/raw/` and `smoke/cache/`.
+
+**What ran.** 6 SciFact claims disjoint from the main 150 (2 SUPPORT / 2 REFUTE / 2 NEI,
+`smoke.seed = 20261115`), condition C0 with the frozen prompts and the same render path as the
+main run, 5 samples per claim at T=0.7 and again at T=1.0: 60 calls, all `finish_reason=stop`,
+no retries, no parse failures. Logs in `smoke/void_2026-11-14/raw/`, in-memory cache dumped to
+`smoke/void_2026-11-14/cache/`, selection in `smoke/claims.jsonl`, report in
+`smoke/void_2026-11-14/report.md`. Token cost: 36,469 (31,380 input / 5,089 output).
+
+**Classification.** These prompts contain real SciFact claim and evidence text, so under the
+2026-11-14 §7 rule this smoke run is a "result", not an infrastructure check. It was executed
+before any `spec-frozen` tag exists, at the human's explicit direction, and is recorded here as
+the first result rather than left implicit. The main 150 and `results/raw/` are untouched.
+
+**Findings (smoke, not main results).** Both settings are stochastic. At T=0.7 the 6 claims
+produced 19 distinct (verdict, confidence) pairs; at T=1.0 also 19, with identical per-claim
+verdict counts and confidence moving 1-2 points either way. No dispersion increase from raising
+the temperature is detectable at n=6x5; this does not establish that the knob does nothing, only
+that T=0.7 is already non-deterministic.
+
+**Config.** Added only `smoke.seed: 20261115`; `max_tokens: 512` was set by TASK A.
+
+**Sampling decision table (recorded verbatim, per condition a).**
+
+> T=0.7 shows >=2 distinct confidence values or any verdict change on most claims -> keep 0.7.
+> Only confidence varies -> keep 0.7, note that stability is confidence-driven.
+> No variation at 0.7 and 1.0 -> report, change nothing, wait for human.
+> No variation at 0.7 but variation at 1.0 -> report, wait for human before changing temperature.
+
+Applied to the measured rows: all 6 claims show >=2 distinct confidence values at T=0.7
+(19 distinct (verdict, confidence) pairs in total), so the first row fires and the setting is
+**kept at 0.7**. Verdicts are stable on 5/6 claims and flip once on `s_8eb99f781d`, so this
+stability is predominantly confidence-driven rather than verdict-driven.
+
+**Required sentence.** "first subject result precedes spec-frozen, on 6 claims disjoint from the
+main 150, used only to choose sampling settings".
+
+**Ordering note (conditions a and d).** This record was written after the run, not before it, and
+no "Task B" exists in this repository at the time of writing (single `main` branch; tags
+`data-frozen`, `prompts-v1`, `spec-v1.1`). The run was executed when the human selected "run now"
+for Option 1; the conditions requiring the entry before running and a merged Task B therefore
+could not be met as stated. §7 was not changed again. All smoke outputs are under `smoke/` and are
+read only by `smoke/run_smoke.py` and `tests/test_smoke.py`, never by analysis code (none exists
+yet). Retention is decided: void. The sentence above records the chronology of the executed run,
+not an official result; the official first result will be the post-Task-B run.
+
+## 2026-11-14 — §7: infrastructure checks are not "results"
+
+**Change.** §7 no longer counts a qualifying infrastructure check as a "result". A check
+qualifies only if its prompts contain no dataset claim or evidence text; such checks are
+recorded as not having informed any analysis choice. Anything that embeds claim or evidence
+text remains a result.
+
+**Reason.** `probe_api.py` (one run) and 12 supplementary calls used the trivial prompt pair
+"You are a test endpoint. Reply with the single word OK." / "Reply OK." — no SciFact claim,
+no abstract sentence, no condition, no parser output. Counting them as results would have
+forced the `spec-frozen` tag before §5, §6 and `config.yaml` were final, while adding no
+information about the experiment. The boundary is prompt content, so it cannot be used to
+run claim- or evidence-bearing calls before the freeze.
+
+**Findings recorded (not results).** Thinking off returns no `reasoning_content` field;
+thinking on returns it, and at `max_tokens=16` reasoning tokens consume the budget and
+truncate `content` to empty. Temperature 0.7 is accepted and range-validated
+(`temperature=3.0` rejected), but sampling variability on real verifier prompts remains
+unverified: the "Reply OK." calls are degenerate and cannot establish it.
+
+**Consequences.** These checks did not require a `spec-frozen` tag and did not consume one.
+Any later probe that includes claim or evidence text must be treated as a result and run
+only after the freeze. Full trace in `results/probe_deepseek.md`.
 
 ## 2026-11-14 — §3 Subjects: second API subject replaced by a manual Opus pilot
 
