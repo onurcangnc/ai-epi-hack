@@ -4,6 +4,15 @@ Changes to `SPEC.md` are recorded here with their reason, per SPEC §7. The §3/
 changes below were made before any experiment result existed; the TASK A2 entry
 above is the first result and records that ordering.
 
+## 2026-11-15 — SPEC v1.3.3: call-layer contract alignment
+
+Alignment of SPEC §7 with the tested call-layer contract: StateError on a cache/log disagreement,
+the unmarked-4xx and absent-text row rules, the blocked-marker 400, the 900 s Retry-After cap, and
+the extra cache-key fields (max_retries, backend timeout, blocked_body_markers). No main-run result
+exists; no definition, count or rule changed beyond what the tests already pin.
+
+SPEC SHA-256: `7db9bb0764221abab2e0e8c795197a7a0df02f862eb23a6d5b136342b0c41dc5`
+
 ## 2026-11-14 — conditions-v1.1: LF endings for conditions metadata
 
 conditions_meta.json and HASHES.txt were written with CRLF in commit 0dc10aa; fixed in

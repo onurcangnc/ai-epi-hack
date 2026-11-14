@@ -150,6 +150,15 @@ Generator note (M3-M5): unchanged.
   the row analyzed.
 - The first complete row per (claim, condition, sample_idx) is the result row; later rows are replications.
 - Main run: parse failures are NOT retried (they are an outcome); API errors are retried.
+- run_batch refuses to start (StateError) if the cache directory holds a key that has no result row in
+  the log. verify() alone may still replay a warm cache.
+- At call level, an unmarked non-auth 4xx response and a reply with absent or non-text content and
+  finish_reason "stop" are api_error rows with is_result=false. A third consecutive unmarked non-auth
+  4xx aborts the run. A 400 whose body contains a configured marker
+  (models.deepseek.blocked_body_markers) is a blocked result row. Absent-text api_error rows become
+  result rows only after the resume passes.
+- Retry-After is honored up to 900 s; ordinary backoff is capped at 60 s. The cache key also covers
+  max_retries, the backend timeout and blocked_body_markers.
 - The warning in the verifier system prompt is an exempt, documented design choice (it primes
   every condition equally); it is not a leak.
 
