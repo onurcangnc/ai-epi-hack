@@ -1,0 +1,100 @@
+{"id":"c_06ac2eea08","claim":"The mean suicide rate in women is higher after miscarriage than live birth.","flagged":false,"matched_idx":[],"max_ratio":0.375}
+{"id":"c_099e67241d","claim":"Patients in stable partnerships progress from HIV to death at the same rate as patients not in partnerships.","flagged":false,"matched_idx":[],"max_ratio":0.3333}
+{"id":"c_09ded5a975","claim":"Pyridostatin prevents double-strand breaks accumulation.","flagged":true,"matched_idx":[1],"max_ratio":0.5}
+{"id":"c_0bd51cc695","claim":"Cytochrome c is transferred from cytosol to the mitochondrial intermembrane space during apoptosis.","flagged":false,"matched_idx":[],"max_ratio":0.1429}
+{"id":"c_0bf4a78b67","claim":"Mice are incapable of producing neutralizing antibodies in reponse to the Chikungunya virus (CHIKV) produced in mosquitos.","flagged":false,"matched_idx":[],"max_ratio":0.2727}
+{"id":"c_0feb2822b0","claim":"In breast cancer, the loss of myoepithelial cells promotes the transition of ductal carcinoma in situ to invasive carcinoma.","flagged":true,"matched_idx":[0],"max_ratio":0.5455}
+{"id":"c_11d0df9b4d","claim":"Genetic deletion of JAM-A increases gut permeability.","flagged":false,"matched_idx":[],"max_ratio":0.25}
+{"id":"c_15993be060","claim":"Adult tissue-resident macrophages possess a self-renewing capacity.","flagged":false,"matched_idx":[],"max_ratio":0.25}
+{"id":"c_16faefe286","claim":"Hypocretin neurones suppress panicprone state in rats.","flagged":false,"matched_idx":[],"max_ratio":0.1667}
+{"id":"c_1ae0b95992","claim":"DUSP4 downregulation deactivates the Ras-ERK pathway","flagged":false,"matched_idx":[],"max_ratio":0.25}
+{"id":"c_1be27423c2","claim":"Active Ly49Q induces neutrophil polarization.","flagged":true,"matched_idx":[3],"max_ratio":0.5}
+{"id":"c_1c2a8879db","claim":"YAP/TAZ is required in intestinal regeneration in mouse models of ulcerative colitis.","flagged":false,"matched_idx":[],"max_ratio":0.4286}
+{"id":"c_1c4f6255d1","claim":"In patients with congenital heart defects, β-blockers significantly improve clinical heart failure outcomes.","flagged":false,"matched_idx":[],"max_ratio":0.4}
+{"id":"c_1d97b46afe","claim":"miR-142-5P is a temperature-sensitive microRNA (miRNA).","flagged":true,"matched_idx":[2],"max_ratio":0.75}
+{"id":"c_1dcd18cc9a","claim":"N348I mutations reduce resistance to nevirapine.","flagged":true,"matched_idx":[1,5,7,8,10],"max_ratio":0.75}
+{"id":"c_229aa51f8d","claim":"Angiotensin converting enzyme inhibitors are associated with decreased risk for functional renal insufficiency.","flagged":false,"matched_idx":[],"max_ratio":0.4}
+{"id":"c_248a4d39d3","claim":"Headaches are correlated with cognitive impairment.","flagged":true,"matched_idx":[15],"max_ratio":0.5}
+{"id":"c_29fde1b285","claim":"Whole brain radiotherapy increases the occurrence of new brain metastases.","flagged":true,"matched_idx":[0],"max_ratio":0.5}
+{"id":"c_2cdc82fae8","claim":"Monoclonal antibody targeting of N-cadherin encourages metastasis.","flagged":false,"matched_idx":[],"max_ratio":0.3333}
+{"id":"c_2d74fbec7e","claim":"GATA3 regulates cell cycle progression in bone marrow hematopoietic stem cells.","flagged":false,"matched_idx":[],"max_ratio":0.4}
+{"id":"c_2de15092d6","claim":"1/2000 in UK have abnormal PrP positivity.","flagged":true,"matched_idx":[3,7],"max_ratio":0.5}
+{"id":"c_324ca879d2","claim":"Mutations in RIM1 raise levels of IME1 RNA.","flagged":false,"matched_idx":[],"max_ratio":0.3333}
+{"id":"c_326a30d4fe","claim":"Lupus-prone mice infected with curliproducing bacteria have higher autoantibody titers compared to controls.","flagged":false,"matched_idx":[],"max_ratio":0.2727}
+{"id":"c_329954bd0c","claim":"Intake of folic acid (FA) and vitamin B6 (VB6) increases levels of homocysteine.","flagged":false,"matched_idx":[],"max_ratio":0.2857}
+{"id":"c_34b14515b6","claim":"An M2-like phenotype in brown adipose tissue macrophages is quickly induced by cold exposure.","flagged":false,"matched_idx":[],"max_ratio":0.4}
+{"id":"c_36cc837ce7","claim":"Pharmacist attendance at ward rounds increases adverse events in wards.","flagged":true,"matched_idx":[2],"max_ratio":0.5}
+{"id":"c_395502bd61","claim":"General exercise therapy is more effective than scapular stabilizer exercises in reducing pain and improving function of the shoulder.","flagged":false,"matched_idx":[],"max_ratio":0.4167}
+{"id":"c_3a888e6186","claim":"Lice attenuated SIV vaccines induce a stronger antigen-specific T cell response in lymph node cells.","flagged":false,"matched_idx":[],"max_ratio":0.3333}
+{"id":"c_3f3bcc01bf","claim":"Vitamin D deficiency is unrelated to birth weight.","flagged":false,"matched_idx":[],"max_ratio":0.4}
+{"id":"c_4182468991","claim":"G-CSF increases the expansion and infiltration of MDSCs into tumors.","flagged":false,"matched_idx":[],"max_ratio":0.2}
+{"id":"c_46bc5407bd","claim":"Anthrax spores remain deadly until affected areas are decontaminated.","flagged":false,"matched_idx":[],"max_ratio":0.1429}
+{"id":"c_477fa31941","claim":"MafA ubiquitination decreases the recruitment of coavtivator P/CAF by MafA.","flagged":false,"matched_idx":[],"max_ratio":0.4}
+{"id":"c_484b6277c4","claim":"Antimicrobial agents are more effective due to the pressure of antimicrobial usage.","flagged":false,"matched_idx":[],"max_ratio":0.0}
+{"id":"c_4a7d146372","claim":"Taking 400mg of α-tocopheryl acetate in combination with vitamin C reduces the risk of prostate cancer.","flagged":false,"matched_idx":[],"max_ratio":0.4444}
+{"id":"c_4d4a11d7b4","claim":"Blocking the interaction between TDP-43 and respiratory complex I proteins ND3 and ND6 leads to increased TDP-43-induced neuronal loss.","flagged":false,"matched_idx":[],"max_ratio":0.2}
+{"id":"c_4e730e0a63","claim":"The myocardial lineage develops from cardiac progenitors of mesodermal origin.","flagged":false,"matched_idx":[],"max_ratio":0.1429}
+{"id":"c_5266d6e19c","claim":"Antimicrobial agents are less effective due to the pressure of antimicrobial usage.","flagged":false,"matched_idx":[],"max_ratio":0.0}
+{"id":"c_52d0e0957d","claim":"Rapid phosphotransfer rates are correlated with histidine kinase regulator specificity.","flagged":false,"matched_idx":[],"max_ratio":0.25}
+{"id":"c_5794dbe07e","claim":"Cardiac tissue-resident macrophages directly contribute to electrical activity.","flagged":false,"matched_idx":[],"max_ratio":0.375}
+{"id":"c_5884774863","claim":"Androgenetic haploid mouse embryonic stem cells (ESCs) can be derived and genetically manipulated in vitro.","flagged":false,"matched_idx":[],"max_ratio":0.4545}
+{"id":"c_615ce6af66","claim":"In breast cancer, the loss of myoepithelial cells slows the transition of ductal carcinoma in situ to invasive carcinoma.","flagged":true,"matched_idx":[0],"max_ratio":0.5455}
+{"id":"c_63118dfee0","claim":"Exposure to fine particulate air pollution is unrelated to anxiety prevalence.","flagged":true,"matched_idx":[0],"max_ratio":0.5714}
+{"id":"c_67ffb4daad","claim":"Synaptic activity enhances local release of brain derived neurotrophic factor from postsynaptic dendrites.","flagged":false,"matched_idx":[],"max_ratio":0.3636}
+{"id":"c_6806a7bae5","claim":"Eilat virus (EILV) produced in mosquitos elicits rapid and long-lasting neutralizing antibodies in nonhuman primates.","flagged":false,"matched_idx":[],"max_ratio":0.2308}
+{"id":"c_68c7b8c5d7","claim":"Alirocumab treatment reduces apo(a) fractional clearance rate.","flagged":false,"matched_idx":[],"max_ratio":0.3333}
+{"id":"c_6ccc687d88","claim":"NR5A2 is important in development of endometrial tissues.","flagged":false,"matched_idx":[],"max_ratio":0.25}
+{"id":"c_751d6ff164","claim":"UCB T cells reduce TCR diversity after transplantation.","flagged":true,"matched_idx":[0],"max_ratio":0.5}
+{"id":"c_78ec2ab25b","claim":"Egr2 regulates the homeostasis of B and T cells.","flagged":false,"matched_idx":[],"max_ratio":0.0}
+{"id":"c_7a0afe79d5","claim":"ALDH1 expression is associated with poorer prognosis for breast cancer primary tumors.","flagged":false,"matched_idx":[],"max_ratio":0.3333}
+{"id":"c_7bc8929b1c","claim":"Phase information is useful for predicting donor-recipient matches in organ transplantation.","flagged":false,"matched_idx":[],"max_ratio":0.1111}
+{"id":"c_7e7b82dbe2","claim":"Taking 400mg of α-tocopheryl acetate does not prevent prostate cancer.","flagged":false,"matched_idx":[],"max_ratio":0.3333}
+{"id":"c_7e87ecf090","claim":"FoxO3a activation in neuronal death is mediated by reactive oxygen species (ROS).","flagged":false,"matched_idx":[],"max_ratio":0.25}
+{"id":"c_80e1f12abf","claim":"The tip of the inner tube of the toxic type VI secretion system (T6SS) antibacterial effector in Escherichia coli (E. coli) carries toxic effector proteins.","flagged":false,"matched_idx":[],"max_ratio":0.25}
+{"id":"c_8261837cf5","claim":"Smc5/6 engagment halts the activation of SUMO E3 ligase Mms21 by ATP-dependent remolding.","flagged":false,"matched_idx":[],"max_ratio":0.4286}
+{"id":"c_856f6c74a4","claim":"LDL cholesterol has no involvement in the development of cardiovascular disease.","flagged":true,"matched_idx":[11],"max_ratio":0.6}
+{"id":"c_85fe96ac5a","claim":"Suboptimal nutrition is not predictive of chronic disease","flagged":false,"matched_idx":[],"max_ratio":0.2}
+{"id":"c_86fa42b2c3","claim":"Pyridostatin encourages proliferation of homologous recombination - defective cells.","flagged":false,"matched_idx":[],"max_ratio":0.2857}
+{"id":"c_93084f3ca7","claim":"Exercise reduces cancer mortality rates among Chinese citizens.","flagged":false,"matched_idx":[],"max_ratio":0.375}
+{"id":"c_9b43c8327f","claim":"Depletion of nitric oxide is responsible for vasospasm.","flagged":false,"matched_idx":[],"max_ratio":0.2}
+{"id":"c_9d2985784d","claim":"Vitamin D deficiency effects the term of delivery.","flagged":false,"matched_idx":[],"max_ratio":0.0}
+{"id":"c_9f45e411a6","claim":"Ultrasound guidance significantly raises the number of traumatic procedures when attempting needle insertion.","flagged":true,"matched_idx":[0],"max_ratio":0.5}
+{"id":"c_a1d078ce6f","claim":"The mean suicide rate in women is lower after miscarriage than live birth.","flagged":false,"matched_idx":[],"max_ratio":0.375}
+{"id":"c_a24d5f750c","claim":"CX3CR1 on the Th2 cells promotes T cell survival","flagged":true,"matched_idx":[5],"max_ratio":0.5}
+{"id":"c_a4d5fc5228","claim":"Carriers of the alcohol aldehyde dehydrogenase deficiency mutation drink less that non-carries.","flagged":false,"matched_idx":[],"max_ratio":0.3333}
+{"id":"c_a6e2e74fe1","claim":"There is no relation between Erythromycin use and hypertrophic pyloric stenosis.","flagged":true,"matched_idx":[0],"max_ratio":0.6}
+{"id":"c_a797cc2f93","claim":"In British Men, haplogroup I increases risk of cardiovascular disease by 50%.","flagged":true,"matched_idx":[8],"max_ratio":0.6667}
+{"id":"c_a9dbf1ba5d","claim":"Increased microtubule acetylation exacerbates LRRK2 Roc-COR domain mutation induced locomotor deficits.","flagged":false,"matched_idx":[],"max_ratio":0.4}
+{"id":"c_abe0a6eec1","claim":"The risk of male prisoners harming themselves is ten times that of female prisoners.","flagged":true,"matched_idx":[13],"max_ratio":0.6667}
+{"id":"c_b2f56fae86","claim":"Cellular differentiation of embryonic stem cells is accompanied by changes in replication timing, transcription and nuclear localization.","flagged":true,"matched_idx":[3],"max_ratio":0.5}
+{"id":"c_b3062a7fb0","claim":"Microcin J25 encourages nucleoside triphosphate (NTP) binding.","flagged":false,"matched_idx":[],"max_ratio":0.2}
+{"id":"c_b3308519c5","claim":"Inhibiting focal adhesion formation increases the rate at which cells convert mechanical strain into inflammation and fibrosis.","flagged":false,"matched_idx":[],"max_ratio":0.25}
+{"id":"c_b366fb5b2e","claim":"Lack of FGF21 in mice slows the rate of atherosclerotic plaque formation.","flagged":false,"matched_idx":[],"max_ratio":0.1429}
+{"id":"c_b8ec87dc66","claim":"There is a positive correlation between hip fractures and statin use.","flagged":true,"matched_idx":[0],"max_ratio":0.5}
+{"id":"c_bda8e2918e","claim":"Replacement of histone H2A with H2A.Z slows gene activation in yeasts by stabilizing +1 nucleosomes.","flagged":false,"matched_idx":[],"max_ratio":0.25}
+{"id":"c_bdbc359ada","claim":"In melanoma, anti-CTLA-4 treatment reinvigorates exhausted PD-1+Eomes+CD8 T cells.","flagged":true,"matched_idx":[11],"max_ratio":0.5}
+{"id":"c_bdf6f845ab","claim":"ART substantially reduces infectiveness of HIV-positive people.","flagged":false,"matched_idx":[],"max_ratio":0.0}
+{"id":"c_bf81dd20cf","claim":"A high microerythrocyte count raises vulnerability to severe anemia in homozygous alpha (+)- thalassemia trait subjects.","flagged":false,"matched_idx":[],"max_ratio":0.25}
+{"id":"c_c39d764626","claim":"Incidence rates of cervical cancer have increased due to nationwide screening programs based primarily on cytology to detect uterine cervical cancer.","flagged":false,"matched_idx":[],"max_ratio":0.3077}
+{"id":"c_c66858cac3","claim":"RTEL1 interacts with TRF2 through a C4C4 motif","flagged":false,"matched_idx":[],"max_ratio":0.3333}
+{"id":"c_c6def2d385","claim":"APOE4 expression in iPSC-derived neurons results in decreased tau phosphorylation.","flagged":false,"matched_idx":[],"max_ratio":0.375}
+{"id":"c_c8e67a102c","claim":"The YAP1 and TEAD complex tanslocates into the nucleus where it interacts with transcription factors and DNA-binding proteins that modulate target gene transcription.","flagged":false,"matched_idx":[],"max_ratio":0.25}
+{"id":"c_ccadb47de9","claim":"Participating in six months of physical activity improves cognitive functioning.","flagged":false,"matched_idx":[],"max_ratio":0.4286}
+{"id":"c_cd797610ab","claim":"Taking 400mg of α-tocopheryl acetate helps to prevent prostate cancer.","flagged":false,"matched_idx":[],"max_ratio":0.2857}
+{"id":"c_cda49a6876","claim":"T cell receptor /CD3 microdomains are required to induce the immunologic synapse.","flagged":false,"matched_idx":[],"max_ratio":0.0}
+{"id":"c_cdab8a484a","claim":"Migraine with aura is associated with ischemic stroke.","flagged":false,"matched_idx":[],"max_ratio":0.4}
+{"id":"c_d10e3ab553","claim":"CX3CR1 on the Th2 cells impairs T cell survival","flagged":true,"matched_idx":[5],"max_ratio":0.5}
+{"id":"c_d44eae332d","claim":"JMJD6 slows the hydroxylation of C-terminal lysine","flagged":false,"matched_idx":[],"max_ratio":0.2}
+{"id":"c_d63ad6057d","claim":"The risk of cancer rises with level of alcohol consumption.","flagged":true,"matched_idx":[0,2,3,9,12],"max_ratio":0.6667}
+{"id":"c_deee2467f7","claim":"AIRE is expressed in some skin tumors.","flagged":true,"matched_idx":[0],"max_ratio":0.5}
+{"id":"c_e2e4496f81","claim":"Bariatric surgery leads to positive outcomes in mental health.","flagged":true,"matched_idx":[1,2,6,10],"max_ratio":0.7143}
+{"id":"c_e407a77fe8","claim":"Sepsis related mortality has risen from 2009 to 2014.","flagged":true,"matched_idx":[0],"max_ratio":0.5}
+{"id":"c_e8b36423be","claim":"The myocardial cell lineage originally develops from cardiac progenitors of exclusively endodermal origin.","flagged":false,"matched_idx":[],"max_ratio":0.2}
+{"id":"c_e95faa38cc","claim":"BRCA 1 mutation carriers' risk of breast and ovarian cancer depends on where the mutation is located.","flagged":true,"matched_idx":[9,10],"max_ratio":0.6667}
+{"id":"c_eeb0bef5b9","claim":"Podocytes are motile and migrate in the presence of injury.","flagged":false,"matched_idx":[],"max_ratio":0.2}
+{"id":"c_f113e6f01a","claim":"Diabetes remission occurs less in people treated with conventional therapy than in people treated with laparoscopic adjustable gastric banding surgery.","flagged":true,"matched_idx":[4],"max_ratio":0.5385}
+{"id":"c_f26eb46264","claim":"Patients with common epithelial cancers are less likely to have an emergency event as their first hospital admission if they live in resource-deprived areas.","flagged":false,"matched_idx":[],"max_ratio":0.3333}
+{"id":"c_f42fc8c581","claim":"PTEN is a regulator for the transcriptional activity of SRF","flagged":false,"matched_idx":[],"max_ratio":0.25}
+{"id":"c_f4d38c0872","claim":"Leuko-increased blood increases infectious complications in red blood cell transfusion.","flagged":false,"matched_idx":[],"max_ratio":0.25}
+{"id":"c_f70a5ef36c","claim":"40mg/day dosage of folic acid and 2mg/day dosage of vitamin B12 does not affect chronic kidney disease (CKD) progression.","flagged":true,"matched_idx":[2],"max_ratio":0.5556}
+{"id":"c_fd48f33111","claim":"Increased vessel density along with a reduction in fibrosis decreases the efficacy of chemotherapy treatments.","flagged":false,"matched_idx":[],"max_ratio":0.0}
