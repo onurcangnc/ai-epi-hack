@@ -1,0 +1,38 @@
+# Configuration for the SciFact verifier-degradation study (Task 1).
+# All relative paths are resolved against the directory containing this file.
+
+# Single explicit seed for every random choice (subset sampling, opaque ids).
+# I chose this value; change it and rebuild to get a different subset.
+seed: 20261114
+
+data:
+  name: scifact
+  # Official release (the same tarball the Hugging Face `allenai/scifact`
+  # script downloads). Hash verified before extraction.
+  source_url: https://scifact.s3-us-west-2.amazonaws.com/release/latest/data.tar.gz
+  source_sha256: 11c621288d41ac144d29b13b0f8503b3820b7d6e8b1f6ff24dff335c196d76be
+  raw_dir: data/raw/scifact
+  # train + dev are labeled; test is unlabeled and has no associated abstracts.
+  splits: [train, dev]
+  files:
+    corpus: corpus.jsonl
+    claims: claims_{split}.jsonl
+  output:
+    verifier_input: data/verifier_input.jsonl
+    gold: data/gold.jsonl
+    key: data/key.jsonl
+    hashes: data/HASHES.txt
+
+subset:
+  per_label:
+    SUPPORT: 50
+    REFUTE: 50
+    NEI: 50
+  id_prefix: c_
+  id_hex_len: 10
+
+# Opus 5.5 manual pilot (SPEC §3). Separate seed key and its own RNG stream;
+# these claims are nested inside the 150 and frozen before any DeepSeek result.
+pilot:
+  seed: 20261114
+  per_class: 10
