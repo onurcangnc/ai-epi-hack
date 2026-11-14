@@ -4,6 +4,14 @@ Changes to `SPEC.md` are recorded here with their reason, per SPEC §7. The §3/
 changes below were made before any experiment result existed; the TASK A2 entry
 above is the first result and records that ordering.
 
+## 2026-11-15 — SPEC v1.4: amendments after the conditions review; no main-run result exists
+
+Sections 1, 5, 6, 7 and 8 amended: two primary contrasts (M1 - C0p, M2 - C2), core/extended tiers,
+the descriptor file, revised M2 outcome columns, a regex-based count of non-ok M2 replies, non-blind
+instruction coding, the length/absent-text result-row rules, and six new limitations.
+
+SPEC SHA-256: `909270eab3143531b6b6006a5c5faaf9c64489a3b84eedb6706e7608cf6fdac2`
+
 ## 2026-11-15 — SPEC v1.3.3: call-layer contract alignment
 
 Alignment of SPEC §7 with the tested call-layer contract: StateError on a cache/log disagreement,
