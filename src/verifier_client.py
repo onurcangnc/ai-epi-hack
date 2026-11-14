@@ -709,14 +709,15 @@ class VerifierClient:
 
                 if not isinstance(result.text, str):
                     # No string content = the provider returned no reply. This is
-                    # an API failure, not the model's non-compliance, and it stays
-                    # resume-eligible rather than becoming a result row.
+                    # an API failure, not the model's non-compliance. Pass 0 never
+                    # produces a result row; only the final resume pass does.
                     row = self._row(
                         claim_id=claim_id, condition=condition,
                         sample_idx=sample_idx, cache_key=key,
                         user_prompt=user_prompt,
                         user_prompt_sha256=user_prompt_sha256, escapes=escapes,
-                        outcome="api_error", raw_response=None, parsed=None,
+                        outcome="api_error",
+                        raw_response=_raw_text(result.text), parsed=None,
                         result=result,
                         input_tokens=result.input_tokens,
                         output_tokens=result.output_tokens,
@@ -724,7 +725,8 @@ class VerifierClient:
                         attempt_idx=attempt_idx, total_attempts=attempt_idx + 1,
                         first_attempt_outcome=first_attempt_outcome or "api_error",
                         used_attempt_idx=attempt_idx, attempts=attempt_idx,
-                        is_result=False, finish_reason=finish_reason,
+                        is_result=(is_last_pass and resume_pass > 0),
+                        finish_reason=finish_reason,
                         order_seed=order_seed, resume_pass=resume_pass,
                         error="response carried no string content",
                     )
