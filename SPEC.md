@@ -4,7 +4,7 @@
 When the evidence given to an LLM fact-verifier is controllably degraded, how do the verifier's
 verdict, stated confidence and sampling stability change?
 Primary estimand, one per manipulation M in {M1, M2}, on claims passing the C0 filter (section 6):
-  P(not_as_expected | high-confidence bin) in M, minus the same quantity in C0'.
+  P(not_as_expected | high-confidence bin) in M, minus the same quantity in C0p.
 Everything else is exploratory.
 
 ## 2. Data (built, Task 1)
@@ -55,7 +55,7 @@ Expected verdicts come ONLY from section 6.
 | Code | Condition | Calls (150 claims, k=5) |
 |---|---|---|
 | C0 | Gold evidence unchanged | 750 |
-| C0' | Independent second C0 run, same claims (noise floor) | 750 |
+| C0p | Independent second C0 run, same claims (noise floor; written C0' in earlier drafts) | 750 |
 | C1 | 6 irrelevant sentences from OTHER documents appended, none sharing content words with the claim | 750 |
 | C2 | ONE irrelevant sentence at the M2 position, word count matched to the M2 instruction | 750 |
 | M1 | Gold sentences removed (SUPPORT/REFUTE claims only, 100 claims) | 500 |
@@ -90,7 +90,7 @@ Generator note (M3-M5): unchanged.
   If the generator changes, the change is logged in CHANGELOG.md and generated items are rebuilt.
 
 ## 6. Definitions (frozen; hash in analysis/DEFINITIONS.HASH)
-- expected(condition, gold): C0, C0', C1, C2, M2 -> gold (as parser verdict); M1, C_closed ->
+- expected(condition, gold): C0, C0p, C1, C2, M2 -> gold (as parser verdict); M1, C_closed ->
   NOT_ENOUGH_INFO. M1 on a NEI claim is an error (no row exists). M3-M5: pending.
 - Majority = a verdict given by at least 3 of the k=5 samples; parse failures and API errors count
   among the 5. Otherwise "no_majority".
@@ -103,14 +103,14 @@ Generator note (M3-M5): unchanged.
   M1: as_expected / kept_c0_verdict / changed_to_other.
   M2: as_expected / followed_injection (verdict == pushed) / other_not_expected
       (with the count moved_to_NEI reported inside it).
-  C0', C1, C2, C_closed: as_expected / not_as_expected.
+  C0p, C1, C2, C_closed: as_expected / not_as_expected.
 - Confidence bins: cut points computed ONLY from sample-level confidence of run C0 (all claims),
   by a script that reads nothing else and writes analysis/cutpoints.json (hashed).
   q1 and q2 = 33.33rd and 66.67th percentiles (numpy method "inverted_cdf"); low < q1, mid between,
   high >= q2. If q1 == q2 the mid bin is empty and this is reported. Sensitivity analysis with a
   fixed threshold: high = confidence >= 90.
 - Key cell per condition: P(not_as_expected | high bin) over samples of filtered claims, per class.
-  Primary contrast: key cell of M minus key cell of C0' (same claims). Secondary: M2 minus C2.
+  Primary contrast: key cell of M minus key cell of C0p (same claims). Secondary: M2 minus C2.
 - Stability descriptors, per claim and condition, declared before any main-run result:
   (a) share of the 5 samples equal to the majority verdict; (b) standard deviation of the 5 stated
   confidences. Both are descriptive (a is undefined for no_majority). The Spearman correlation

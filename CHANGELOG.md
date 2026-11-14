@@ -4,6 +4,13 @@ Changes to `SPEC.md` are recorded here with their reason, per SPEC §7. The §3/
 changes below were made before any experiment result existed; the TASK A2 entry
 above is the first result and records that ordering.
 
+## 2026-11-14 — SPEC v1.3.2: C0p notation
+
+SPEC notation C0' -> C0p to match code and file names. Typographic only: no definition, count or
+rule changed; no main-run result exists.
+
+SPEC SHA-256: `af76fe4e5447de638790c37258eebe6a9052f9f88699828056f664d62b2c876a`
+
 ## 2026-11-14 — SPEC v1.3.1: restore study-level result, rename row-level term
 
 Terminology split: "result" is the study-level unit (any output from a subject model, the thing the
