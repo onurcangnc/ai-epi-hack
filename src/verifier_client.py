@@ -484,6 +484,7 @@ class VerifierClient:
         order_seed: int | None = None,
         resume_pass: int = 0,
         is_last_pass: bool = True,
+        in_batch: bool = False,
     ) -> dict[str, Any]:
         """Run one verifier call (with retries/cache) and log the result."""
         claim_text, claim_tags = escape_tags(claim)
@@ -725,7 +726,7 @@ class VerifierClient:
                         attempt_idx=attempt_idx, total_attempts=attempt_idx + 1,
                         first_attempt_outcome=first_attempt_outcome or "api_error",
                         used_attempt_idx=attempt_idx, attempts=attempt_idx,
-                        is_result=(is_last_pass and resume_pass > 0),
+                        is_result=(in_batch and is_last_pass),
                         finish_reason=finish_reason,
                         order_seed=order_seed, resume_pass=resume_pass,
                         error="response carried no string content",
@@ -913,7 +914,7 @@ class VerifierClient:
         for item in pending:
             row = self.verify(
                 **item, order_seed=order_seed, resume_pass=0,
-                is_last_pass=(resume_passes == 0),
+                is_last_pass=(resume_passes == 0), in_batch=True,
             )
             rows_by_key[row["cache_key"]] = row
             status = row.get("http_status")
@@ -941,7 +942,7 @@ class VerifierClient:
             for item in failing:
                 row = self.verify(
                     **item, order_seed=order_seed,
-                    resume_pass=pass_index, is_last_pass=final,
+                    resume_pass=pass_index, is_last_pass=final, in_batch=True,
                 )
                 rows_by_key[row["cache_key"]] = row
 
