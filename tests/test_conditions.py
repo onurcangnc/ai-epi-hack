@@ -65,6 +65,38 @@ def test_hashes_cover_every_condition_file(built):
     assert names == {f"data/conditions/{code}.jsonl" for code in bc.CODES}
 
 
+def test_no_cr_bytes_in_any_conditions_file(built):
+    out, _ = built
+    offenders = [
+        path.name
+        for path in sorted(out.iterdir())
+        if path.is_file() and b"\r" in path.read_bytes()
+    ]
+    assert offenders == []
+
+
+def test_hashes_are_lf_and_match_the_jsonl_files(built):
+    import hashlib
+
+    out, _ = built
+    assert b"\r" not in (out / "HASHES.txt").read_bytes()
+    rows = bc.read_hash_lines(out / "HASHES.txt")
+    assert len(rows) == 7
+    for digest, relative in rows:
+        path = out / Path(relative).name
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == digest
+
+
+def test_metadata_refresh_only_touches_the_two_metadata_files(built):
+    out, _ = built
+    before = {path.name: path.read_bytes() for path in out.glob("*.jsonl")}
+    bc.refresh_metadata(CONFIG, out_dir=out)
+    after = {path.name: path.read_bytes() for path in out.glob("*.jsonl")}
+    assert before == after
+    assert b"\r" not in (out / "HASHES.txt").read_bytes()
+    assert b"\r" not in (out / "conditions_meta.json").read_bytes()
+
+
 # --------------------------------------------------------------------------- #
 # M1
 # --------------------------------------------------------------------------- #

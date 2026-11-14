@@ -76,6 +76,61 @@ def stopwords_sha256() -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def write_text_lf(path: Path, text: str) -> None:
+    """Write UTF-8 with LF endings (no BOM, no CRLF translation)."""
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+
+
+def metadata_payload(config: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "c0p_note": "C0p.jsonl is a byte-identical copy of C0.jsonl; pass condition='C0p' at run time.",
+        "stopwords_sha256": stopwords_sha256(),
+        "stopwords_count": len(STOPWORDS),
+        "m2": config["m2"],
+        "c1": config["c1"],
+    }
+
+
+def hash_lines(paths: dict[str, Path]) -> list[str]:
+    return [
+        f"{sha256_file(paths[code])}  data/conditions/{paths[code].name}"
+        for code in CODES
+    ]
+
+
+def read_hash_lines(path: Path) -> list[tuple[str, str]]:
+    """Parse a HASHES.txt guard file, tolerating CR and surrounding whitespace."""
+    rows: list[tuple[str, str]] = []
+    for raw in Path(path).read_text(encoding="utf-8").splitlines():
+        line = raw.replace("\r", "").strip()
+        if not line:
+            continue
+        digest, relative = line.split(None, 1)
+        rows.append((digest.strip(), relative.strip()))
+    return rows
+
+
+def refresh_metadata(config_path: Path, *, out_dir: Path | None = None) -> dict[str, Any]:
+    """Rewrite only conditions_meta.json and HASHES.txt from existing .jsonl files."""
+    config_path = Path(config_path).resolve()
+    root = config_path.parent
+    config = load_config(config_path)
+    output = Path(out_dir) if out_dir is not None else root / "data" / "conditions"
+    paths = {code: output / f"{code}.jsonl" for code in CODES}
+    missing = [path for path in paths.values() if not path.is_file()]
+    if missing:
+        raise DataError(
+            "cannot refresh metadata; missing condition files: "
+            + ", ".join(str(path) for path in missing)
+        )
+    meta_path = output / "conditions_meta.json"
+    hashes_path = output / "HASHES.txt"
+    write_text_lf(meta_path, json.dumps(metadata_payload(config), indent=2) + "\n")
+    write_text_lf(hashes_path, "\n".join(hash_lines(paths)) + "\n")
+    return {"meta": str(meta_path), "hashes": str(hashes_path)}
+
+
 def insert_at(evidence: list[dict[str, Any]], position: str, sentence: dict[str, Any]) -> list[dict[str, Any]]:
     if position == "start":
         index = 0
@@ -399,21 +454,8 @@ def build(config_path: Path, *, force: bool = False, out_dir: Path | None = None
     write_jsonl(extras["skips"], [{"id": cid, "reason": "NEI"} for cid in sorted(empty_rows)])
     write_jsonl(extras["overlap"], sorted(overlap_rows, key=lambda row: row["id"]))
 
-    meta = {
-        "c0p_note": "C0p.jsonl is a byte-identical copy of C0.jsonl; pass condition='C0p' at run time.",
-        "stopwords_sha256": stopwords_sha256(),
-        "stopwords_count": len(STOPWORDS),
-        "m2": m2,
-        "c1": c1_cfg,
-    }
-    extras["meta"].write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
-
-    hash_lines = []
-    for code in CODES:
-        hash_lines.append(
-            f"{sha256_file(paths[code])}  data/conditions/{paths[code].name}"
-        )
-    extras["hashes"].write_text("\n".join(hash_lines) + "\n", encoding="utf-8")
+    write_text_lf(extras["meta"], json.dumps(metadata_payload(config), indent=2) + "\n")
+    write_text_lf(extras["hashes"], "\n".join(hash_lines(paths)) + "\n")
 
     family_position: dict[str, dict[str, int]] = {}
     for label in LABELS:
@@ -449,9 +491,17 @@ def main(argv: list[str] | None = None) -> int:
         default=Path(__file__).resolve().parents[1] / "config.yaml",
     )
     parser.add_argument("--force", action="store_true", help="overwrite existing outputs")
+    parser.add_argument(
+        "--metadata-only",
+        action="store_true",
+        help="rewrite only conditions_meta.json and HASHES.txt (never the .jsonl files)",
+    )
     args = parser.parse_args(argv)
     try:
-        summary = build(args.config, force=args.force)
+        if args.metadata_only:
+            summary = refresh_metadata(args.config)
+        else:
+            summary = build(args.config, force=args.force)
     except DataError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

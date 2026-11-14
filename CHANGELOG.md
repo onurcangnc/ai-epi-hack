@@ -4,6 +4,15 @@ Changes to `SPEC.md` are recorded here with their reason, per SPEC §7. The §3/
 changes below were made before any experiment result existed; the TASK A2 entry
 above is the first result and records that ordering.
 
+## 2026-11-14 — conditions-v1.1: LF endings for conditions metadata
+
+conditions_meta.json and HASHES.txt were written with CRLF in commit 0dc10aa; fixed in
+conditions-v1.1; the seven condition .jsonl files and their hashes are unchanged.
+
+`scripts/build_conditions.py` now writes both files with `newline="\n"` (UTF-8, no BOM), and
+`--metadata-only` refreshes just those two files. A test scans every file under the conditions
+directory for `\r` bytes.
+
 ## 2026-11-14 — SPEC v1.3.2: C0p notation
 
 SPEC notation C0' -> C0p to match code and file names. Typographic only: no definition, count or
