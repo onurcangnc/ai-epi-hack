@@ -35,6 +35,7 @@ class BackendResult:
     input_tokens: int | None
     output_tokens: int | None
     latency_ms: float
+    finish_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -122,7 +123,8 @@ class DeepSeekBackend:
 
         try:
             data = response.json()
-            text = data["choices"][0]["message"]["content"]
+            choice = data["choices"][0]
+            text = choice["message"]["content"]
         except (ValueError, KeyError, IndexError, TypeError) as exc:
             raise BackendError(f"malformed API response: {exc}") from exc
 
@@ -132,4 +134,7 @@ class DeepSeekBackend:
             input_tokens=usage.get("prompt_tokens"),
             output_tokens=usage.get("completion_tokens"),
             latency_ms=latency_ms,
+            finish_reason=choice.get("finish_reason")
+            if isinstance(choice, dict)
+            else None,
         )

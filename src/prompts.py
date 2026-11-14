@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Iterable
 
 SYSTEM_FILENAME = "verifier_system.txt"
 USER_FILENAME = "verifier_user.txt"
@@ -52,3 +53,13 @@ def load_prompts(prompt_dir: Path) -> PromptBundle:
 def render_user(template: str, claim: str, evidence: str) -> str:
     """Fill the user template with placeholders; never use str.format."""
     return template.replace("{claim}", claim).replace("{evidence}", evidence)
+
+
+def render_evidence(sentences: Iterable[dict[str, Any]]) -> str:
+    """Normalise evidence for ALL conditions: strip() each sentence, join with one space.
+
+    This is the single render path for every condition (C0, C0p, C1, C2, M1, M2,
+    ...). Sentence order is preserved; a sentence that is only whitespace
+    collapses to an empty field, exactly as ``strip()`` implies.
+    """
+    return " ".join(str(sentence["text"]).strip() for sentence in sentences)

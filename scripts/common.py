@@ -151,6 +151,16 @@ def validate_config(config: dict[str, Any]) -> None:
     if not isinstance(per_class, int) or isinstance(per_class, bool) or per_class < 1:
         raise DataError("config: 'pilot.per_class' must be a positive integer")
 
+    # Optional here so data-build fixtures need not carry a call-layer cache,
+    # but if present it must be usable.
+    cache = config.get("cache")
+    if cache is not None:
+        if not isinstance(cache, dict):
+            raise DataError("config: 'cache' must be a mapping")
+        directory = cache.get("dir")
+        if not isinstance(directory, str) or not directory:
+            raise DataError("config: 'cache.dir' must be a non-empty string")
+
 
 def resolve(root: Path, relative: str) -> Path:
     """Resolve a config path against the project root."""
@@ -169,10 +179,22 @@ def normalize_gold(label: str) -> str:
 
 
 def expected_verdict(condition: str, gold_label: str) -> str:
-    """Expected verifier verdict for a condition, per SPEC section 6."""
-    if condition in ("C0", "C1", "M2"):
+    """Expected verifier verdict for a condition, per SPEC section 6.
+
+    ``C0p`` is the ASCII spelling of the second C0 run (C0'); use it everywhere.
+    ``M1`` and ``C_closed`` are defined for SUPPORT/REFUTE claims only: a NEI
+    claim has no M1 row, and C_closed is the prior-knowledge baseline for the
+    two directional labels, so both raise instead of returning a silent NO-OP.
+    """
+    if condition in ("C0", "C0p", "C1", "C2", "M2"):
         return normalize_gold(gold_label)
     if condition in ("M1", "C_closed"):
+        normalize_gold(gold_label)  # reject unknown labels before the NEI guard
+        if gold_label == "NEI":
+            raise DataError(
+                f"condition {condition!r} has no row for NEI claims; "
+                "it is defined for SUPPORT/REFUTE only"
+            )
         return "NOT_ENOUGH_INFO"
     if condition in ("M3", "M4", "M5"):
         raise NotImplementedError(

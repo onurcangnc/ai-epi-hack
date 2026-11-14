@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import random
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -15,13 +18,16 @@ from backend import (
     ThinkingConfig,
 )
 from parsing import ParseError, parse_response
-from prompts import PromptError, load_prompts
+from prompts import PromptError, load_prompts, render_evidence
 
+ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 VALID = '{"verdict": "SUPPORTED", "confidence": 80, "rationale": "ok", "evidence_concerns": []}'
 
 
 class MockBackend:
+    """Responses may be a str, an Exception, or a (text, finish_reason) tuple."""
+
     def __init__(self, responses: list):
         self.responses = list(responses)
         self.calls: list[dict] = []
@@ -33,8 +39,16 @@ class MockBackend:
         item = self.responses.pop(0)
         if isinstance(item, Exception):
             raise item
+        if isinstance(item, tuple):
+            text, finish_reason = item
+        else:
+            text, finish_reason = item, "stop"
         return BackendResult(
-            text=item, input_tokens=100, output_tokens=20, latency_ms=5.0
+            text=text,
+            input_tokens=100,
+            output_tokens=20,
+            latency_ms=5.0,
+            finish_reason=finish_reason,
         )
 
 
@@ -49,6 +63,7 @@ def config_dict(**overrides):
         "thinking": {"enabled": False, "budget_tokens": None},
         "concurrency": 2,
         "max_retries": 2,
+        "retry_on": ["api_error"],
         "price_table": {"input_per_mtok": 0.15, "output_per_mtok": 0.6},
     }
     for key, value in overrides.items():
@@ -59,13 +74,18 @@ def config_dict(**overrides):
     return config
 
 
-def make_client(tmp_path: Path, responses: list, **overrides):
+def make_client(tmp_path: Path, responses: list, *, use_cache: bool = True, **overrides):
     model = vc.ModelConfig.from_dict(config_dict(**overrides))
     prompts = load_prompts(FIXTURES)
     backend = MockBackend(responses)
     sleeps: list[float] = []
     client = vc.VerifierClient(
-        model, backend, prompts, tmp_path / "calls.jsonl", sleep=sleeps.append
+        model,
+        backend,
+        prompts,
+        tmp_path / "calls.jsonl",
+        cache_dir=(tmp_path / "cache") if use_cache else None,
+        sleep=sleeps.append,
     )
     return client, backend, sleeps
 
@@ -145,7 +165,7 @@ def test_parse_bad_verdict():
 
 
 # --------------------------------------------------------------------------- #
-# Client basics
+# Client basics and retry policy
 # --------------------------------------------------------------------------- #
 def test_valid_call_logs_everything(tmp_path):
     client, backend, _ = make_client(tmp_path, [VALID])
@@ -157,6 +177,9 @@ def test_valid_call_logs_everything(tmp_path):
     assert row["cached"] is False
     assert row["tokens"] == {"input": 100, "output": 20}
     assert row["cost"] == pytest.approx((100 * 0.15 + 20 * 0.6) / 1_000_000)
+    assert row["finish_reason"] == "stop"
+    assert row["finish_reason_last"] == "stop"
+    assert row["order_seed"] is None
     assert len(row["system_prompt_sha256"]) == 64
     assert len(row["user_prompt_sha256"]) == 64
     assert backend.calls[0]["temperature"] == 0.7
@@ -172,41 +195,47 @@ def test_cost_omitted_without_price_table(tmp_path):
     assert "cost" not in call(client)
 
 
-def test_malformed_exhausts_retries(tmp_path):
-    client, backend, _ = make_client(tmp_path, ["bad", "bad", "bad"])
+def test_parse_failure_is_not_retried(tmp_path):
+    """SPEC v1.1: a parse failure is the result, never retried in the main run."""
+    client, backend, _ = make_client(tmp_path, ["bad", VALID])
     row = call(client)
     assert row["outcome"] == "parse_failure"
     assert row["verdict"] is None
     assert row["raw_response"] == "bad"
-    assert row["attempts"] == 2
-    assert row["attempt_idx"] == 2
-    assert row["used_attempt_idx"] == 2
-    assert row["total_attempts"] == 3
+    assert row["attempts"] == 0
+    assert row["attempt_idx"] == 0
+    assert row["used_attempt_idx"] == 0
+    assert row["total_attempts"] == 1
     assert row["first_attempt_outcome"] == "parse_failure"
-    assert len(backend.calls) == 3
-    assert len(log_rows(tmp_path / "calls.jsonl")) == 3
+    assert row["is_result"] is True
+    assert len(backend.calls) == 1
+    assert len(log_rows(tmp_path / "calls.jsonl")) == 1
 
 
-def test_retry_then_success(tmp_path):
-    client, backend, _ = make_client(tmp_path, ["bad", VALID])
+def test_retry_on_api_error_then_success(tmp_path):
+    client, backend, sleeps = make_client(tmp_path, [BackendTimeout("t"), VALID])
     row = call(client)
     assert row["outcome"] == "ok"
     assert row["attempts"] == 1
     assert row["attempt_idx"] == 1
     assert row["used_attempt_idx"] == 1
-    assert row["first_attempt_outcome"] == "parse_failure"
+    assert row["first_attempt_outcome"] == "api_error"
     assert len(backend.calls) == 2
+    assert len(sleeps) == 1
 
 
-def test_every_attempt_is_logged(tmp_path):
-    client, _, _ = make_client(tmp_path, ["bad-1", "bad-2", VALID])
+def test_every_api_attempt_is_logged(tmp_path):
+    client, _, _ = make_client(
+        tmp_path, [BackendTimeout("t0"), BackendTimeout("t1"), VALID]
+    )
     call(client)
     rows = log_rows(tmp_path / "calls.jsonl")
     assert [row["attempt_idx"] for row in rows] == [0, 1, 2]
-    assert [row["outcome"] for row in rows] == ["parse_failure", "parse_failure", "ok"]
-    assert [row["raw_response"] for row in rows] == ["bad-1", "bad-2", VALID]
+    assert [row["outcome"] for row in rows] == ["api_error", "api_error", "ok"]
+    assert [row["raw_response"] for row in rows] == [None, None, VALID]
     assert [row["is_result"] for row in rows] == [False, False, True]
-    assert [row["first_attempt_outcome"] for row in rows] == ["parse_failure"] * 3
+    assert [row["first_attempt_outcome"] for row in rows] == ["api_error"] * 3
+    assert [row["finish_reason"] for row in rows] == [None, None, "stop"]
     assert rows[-1]["used_attempt_idx"] == 2
     assert rows[-1]["total_attempts"] == 3
 
@@ -217,6 +246,7 @@ def test_parse_failure_is_not_cached(tmp_path):
     assert first["outcome"] == "parse_failure"
     second = call(client)
     assert second["outcome"] == "ok"
+    assert second["cached"] is False
     assert len(backend.calls) == 2
 
 
@@ -257,18 +287,78 @@ def test_non_retryable_backend_error(tmp_path):
     client, backend, _ = make_client(tmp_path, [BackendError("400 bad request")])
     row = call(client)
     assert row["outcome"] == "api_error"
+    assert row["is_result"] is True
     assert len(backend.calls) == 1
 
 
+def test_retry_policy_can_retry_parse_failure(tmp_path):
+    client, backend, _ = make_client(
+        tmp_path, ["bad", VALID], retry_on=["api_error", "parse_failure"]
+    )
+    row = call(client)
+    assert row["outcome"] == "ok"
+    assert row["attempts"] == 1
+    assert row["first_attempt_outcome"] == "parse_failure"
+    assert len(backend.calls) == 2
+
+
+def test_retry_policy_parse_failure_exhausts(tmp_path):
+    client, backend, _ = make_client(
+        tmp_path,
+        ["bad", "bad"],
+        retry_on=["api_error", "parse_failure"],
+        max_retries=1,
+    )
+    row = call(client)
+    assert row["outcome"] == "parse_failure"
+    assert row["attempts"] == 1
+    assert row["total_attempts"] == 2
+    assert len(backend.calls) == 2
+
+
+def test_empty_retry_on_rejected():
+    with pytest.raises(vc.ConfigError, match="retry_on"):
+        vc.ModelConfig.from_dict(config_dict(retry_on=[]))
+
+
+def test_unknown_retry_on_rejected():
+    with pytest.raises(vc.ConfigError, match="unknown entries"):
+        vc.ModelConfig.from_dict(config_dict(retry_on=["timeout"]))
+
+
 # --------------------------------------------------------------------------- #
-# Request body
+# finish_reason
 # --------------------------------------------------------------------------- #
+def test_length_finish_reason_visible_on_result(tmp_path):
+    client, _, _ = make_client(tmp_path, [(VALID, "length")])
+    row = call(client)
+    assert row["outcome"] == "ok"
+    assert row["finish_reason"] == "length"
+    assert row["finish_reason_last"] == "length"
+
+
+def test_absent_finish_reason_is_null(tmp_path):
+    client, _, _ = make_client(tmp_path, [(VALID, None)])
+    row = call(client)
+    assert row["finish_reason"] is None
+    assert row["finish_reason_last"] is None
+
+
+def test_cached_row_keeps_finish_reason(tmp_path):
+    client, backend, _ = make_client(tmp_path, [(VALID, "length")])
+    call(client)
+    cached = call(client)
+    assert cached["cached"] is True
+    assert cached["finish_reason_last"] == "length"
+    assert len(backend.calls) == 1
+
+
 class FakeResponse:
     status_code = 200
 
     def json(self):
         return {
-            "choices": [{"message": {"content": VALID}}],
+            "choices": [{"message": {"content": VALID}, "finish_reason": "length"}],
             "usage": {"prompt_tokens": 1, "completion_tokens": 2},
         }
 
@@ -290,6 +380,15 @@ def make_backend():
     return backend, session
 
 
+def test_backend_extracts_finish_reason():
+    backend, _ = make_backend()
+    result = backend.complete("system", "user", temperature=0.7)
+    assert result.finish_reason == "length"
+
+
+# --------------------------------------------------------------------------- #
+# Request body
+# --------------------------------------------------------------------------- #
 def test_request_body_omits_null_top_p():
     backend, session = make_backend()
     backend.complete(
@@ -331,6 +430,166 @@ def test_cache_separated_by_sample_idx(tmp_path):
     call(client, sample_idx=0)
     call(client, sample_idx=1)
     assert len(backend.calls) == 2
+
+
+def test_cache_is_written_to_disk(tmp_path):
+    client, _, _ = make_client(tmp_path, [VALID])
+    call(client)
+    entries = list((tmp_path / "cache").glob("*.json"))
+    assert len(entries) == 1
+    payload = json.loads(entries[0].read_text(encoding="utf-8"))
+    assert payload["raw"] == VALID
+    assert len(payload["key"]) == 64
+
+
+def test_cache_persists_across_clients(tmp_path):
+    first_client, _, _ = make_client(tmp_path, [VALID])
+    call(first_client)
+
+    second_client, second_backend, _ = make_client(tmp_path, [])
+    row = call(second_client)
+    assert row["cached"] is True
+    assert row["outcome"] == "ok"
+    assert second_backend.calls == []
+
+
+def test_second_process_hits_cache(tmp_path):
+    first_client, _, _ = make_client(tmp_path, [VALID])
+    call(first_client)
+
+    script = tmp_path / "second_process.py"
+    script.write_text(
+        "import json, sys\n"
+        "from pathlib import Path\n"
+        "root, cache, fixtures, log = map(Path, sys.argv[1:5])\n"
+        "sys.path.insert(0, str(root / 'src'))\n"
+        "sys.path.insert(0, str(root / 'scripts'))\n"
+        "from verifier_client import ModelConfig, VerifierClient\n"
+        "from prompts import load_prompts\n"
+        "class Dead:\n"
+        "    def complete(self, *a, **k):\n"
+        "        raise AssertionError('backend called: cache miss')\n"
+        "cfg = ModelConfig.from_dict({\n"
+        "    'base_url': 'https://api.example.test',\n"
+        "    'model': 'deepseek-test',\n"
+        "    'api_key_env': 'DEEPSEEK_API_KEY',\n"
+        "    'temperature': 0.7,\n"
+        "    'top_p': None,\n"
+        "    'max_tokens': 50,\n"
+        "    'thinking': {'enabled': False, 'budget_tokens': None},\n"
+        "    'concurrency': 1,\n"
+        "    'max_retries': 2,\n"
+        "    'retry_on': ['api_error'],\n"
+        "    'price_table': None,\n"
+        "})\n"
+        "client = VerifierClient(cfg, Dead(), load_prompts(fixtures), log, cache_dir=cache)\n"
+        "row = client.verify(\n"
+        "    claim_id='c_1',\n"
+        "    claim='The sky is blue.',\n"
+        "    evidence_sentences=[{'idx': 0, 'text': 'The sky is blue.'}],\n"
+        "    sample_idx=0,\n"
+        "    condition='C0',\n"
+        ")\n"
+        "print(json.dumps({'cached': row['cached'], 'outcome': row['outcome'], 'verdict': row['verdict']}))\n",
+        encoding="utf-8",
+    )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            str(ROOT),
+            str(tmp_path / "cache"),
+            str(FIXTURES),
+            str(tmp_path / "second.jsonl"),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert completed.returncode == 0, completed.stderr
+    payload = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert payload == {"cached": True, "outcome": "ok", "verdict": "SUPPORTED"}
+
+
+# --------------------------------------------------------------------------- #
+# Batch ordering
+# --------------------------------------------------------------------------- #
+def make_items(count: int) -> list[dict]:
+    return [
+        {
+            "claim_id": f"c_{index}",
+            "claim": f"Claim {index}.",
+            "evidence_sentences": [{"idx": 0, "text": f"Evidence {index}."}],
+            "sample_idx": index,
+            "condition": "C0" if index % 2 else "C1",
+        }
+        for index in range(count)
+    ]
+
+
+def test_run_batch_logs_order_seed_in_every_row(tmp_path):
+    client, _, _ = make_client(
+        tmp_path, [VALID] * 6, concurrency=1, retry_on=["parse_failure"]
+    )
+    client.run_batch(make_items(6), order_seed=11)
+    rows = log_rows(tmp_path / "calls.jsonl")
+    assert len(rows) == 6
+    assert [row["order_seed"] for row in rows] == [11] * 6
+
+
+def test_run_batch_shuffle_matches_seed(tmp_path):
+    client, _, _ = make_client(tmp_path, [VALID] * 6, concurrency=1)
+    items = make_items(6)
+    expected = [item["claim_id"] for item in items]
+    random.Random(11).shuffle(expected)
+
+    client.run_batch(items, order_seed=11)
+    logged = [row["claim_id"] for row in log_rows(tmp_path / "calls.jsonl")]
+    assert logged == expected
+
+
+def test_run_batch_is_reproducible_and_seeded(tmp_path):
+    orders = []
+    for seed in (11, 12):
+        directory = tmp_path / str(seed)
+        directory.mkdir()
+        client, _, _ = make_client(directory, [VALID] * 6, concurrency=1)
+        client.run_batch(make_items(6), order_seed=seed)
+        orders.append(
+            [row["claim_id"] for row in log_rows(directory / "calls.jsonl")]
+        )
+    assert orders[0] != orders[1]
+
+
+# --------------------------------------------------------------------------- #
+# Render normalization
+# --------------------------------------------------------------------------- #
+def test_evidence_is_stripped_and_joined_on_the_client_path(tmp_path):
+    client, backend, _ = make_client(tmp_path, [VALID])
+    call(
+        client,
+        evidence_sentences=[
+            {"idx": 0, "text": "First sentence.\n\n  "},
+            {"idx": 1, "text": "   Second sentence.\t"},
+        ],
+    )
+    user = backend.calls[0]["user"]
+    assert "First sentence. Second sentence." in user
+    assert "First sentence.\n" not in user
+    assert "  Second" not in user
+
+
+def test_render_evidence_strips_newlines_and_trailing_spaces():
+    sentences = [
+        {"idx": 0, "text": "  Alpha beta.\n"},
+        {"idx": 1, "text": "Gamma delta.   "},
+        {"idx": 2, "text": "\nEpsilon zeta.\n\n"},
+    ]
+    assert render_evidence(sentences) == "Alpha beta. Gamma delta. Epsilon zeta."
+
+
+def test_render_evidence_empty_list():
+    assert render_evidence([]) == ""
 
 
 # --------------------------------------------------------------------------- #
@@ -393,3 +652,21 @@ def test_null_model_raises_config_error():
 def test_null_concurrency_raises_config_error():
     with pytest.raises(vc.ConfigError, match="models.deepseek.concurrency"):
         vc.ModelConfig.from_dict(config_dict(concurrency=None))
+
+
+def test_null_retry_on_raises_config_error():
+    with pytest.raises(vc.ConfigError, match="models.deepseek.retry_on"):
+        vc.ModelConfig.from_dict(config_dict(retry_on=None))
+
+
+def test_load_cache_dir_resolves_relative(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("cache:\n  dir: cache\n", encoding="utf-8")
+    assert vc.load_cache_dir(config_path) == tmp_path / "cache"
+
+
+def test_load_cache_dir_missing_key(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("seed: 1\n", encoding="utf-8")
+    with pytest.raises(vc.ConfigError, match="cache"):
+        vc.load_cache_dir(config_path)

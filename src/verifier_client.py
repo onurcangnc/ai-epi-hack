@@ -1,12 +1,13 @@
 """Verifier call layer (DeepSeek only).
 
-Wires the frozen prompts, DeepSeek backend, strict parser, in-memory cache,
-retry/backoff and JSONL logging together. Everything that can vary between
-calls is recorded per log row so results stay auditable.
+Wires the frozen prompts, DeepSeek backend, strict parser, persistent cache,
+configurable retry/backoff and JSONL logging together. Everything that can vary
+between calls is recorded per log row so results stay auditable.
 
-Configuration lives under ``models.deepseek`` in config.yaml. Values that the
-human has not set are left null and raise ``ConfigError`` naming the key, so a
-run can never silently use an invented default.
+Configuration lives under ``models.deepseek`` in config.yaml (retry policy
+included). The cache directory comes from ``cache.dir``. Values that the human
+has not set are left null and raise ``ConfigError`` naming the key, so a run can
+never silently use an invented default.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import random
 import sys
 import threading
 import time
@@ -38,7 +40,10 @@ from backend import (  # noqa: E402
 )
 from escaping import escape_tags  # noqa: E402
 from parsing import ParseError, parse_response  # noqa: E402
-from prompts import PromptBundle, load_prompts, render_user  # noqa: E402
+from prompts import PromptBundle, load_prompts, render_evidence, render_user  # noqa: E402
+
+# The only outcomes a retry policy may name.
+RETRYABLE_OUTCOMES = frozenset({"api_error", "parse_failure"})
 
 
 class ConfigError(ValueError):
@@ -67,6 +72,7 @@ class ModelConfig:
     thinking_budget_tokens: int | None
     concurrency: int
     max_retries: int
+    retry_on: tuple[str, ...]
     price_table: dict[str, float] | None
 
     @property
@@ -97,6 +103,7 @@ class ModelConfig:
         temperature = _non_null(section.get("temperature"), "temperature")
         concurrency = _non_null(section.get("concurrency"), "concurrency")
         max_retries = _non_null(section.get("max_retries"), "max_retries")
+        retry_on = _non_null(section.get("retry_on"), "retry_on")
 
         if not isinstance(base_url, str) or not base_url:
             raise ConfigError("config key 'models.deepseek.base_url' must be a non-empty string")
@@ -110,6 +117,23 @@ class ModelConfig:
             raise ConfigError("config key 'models.deepseek.concurrency' must be a positive integer")
         if isinstance(max_retries, bool) or not isinstance(max_retries, int) or max_retries < 0:
             raise ConfigError("config key 'models.deepseek.max_retries' must be a non-negative integer")
+
+        if not isinstance(retry_on, list) or not retry_on:
+            raise ConfigError(
+                "config key 'models.deepseek.retry_on' must be a non-empty list"
+            )
+        for outcome in retry_on:
+            if not isinstance(outcome, str):
+                raise ConfigError(
+                    "config key 'models.deepseek.retry_on' must contain strings"
+                )
+        unknown = sorted(set(retry_on) - RETRYABLE_OUTCOMES)
+        if unknown:
+            raise ConfigError(
+                "config key 'models.deepseek.retry_on' has unknown entries "
+                f"{unknown}; allowed: {sorted(RETRYABLE_OUTCOMES)}"
+            )
+        retry_on = tuple(dict.fromkeys(retry_on))
 
         thinking = section.get("thinking")
         if not isinstance(thinking, dict):
@@ -157,6 +181,7 @@ class ModelConfig:
             thinking_budget_tokens=budget,
             concurrency=concurrency,
             max_retries=max_retries,
+            retry_on=retry_on,
             price_table=price_table,
         )
 
@@ -171,6 +196,23 @@ def load_model_config(config_path: Path) -> ModelConfig:
     if section is None:
         raise ConfigError("config key 'models.deepseek' is missing")
     return ModelConfig.from_dict(section)
+
+
+def load_cache_dir(config_path: Path) -> Path:
+    """Resolve ``cache.dir`` against the directory containing the config file."""
+    config_path = Path(config_path)
+    if not config_path.is_file():
+        raise ConfigError(f"config not found: {config_path}")
+    with config_path.open(encoding="utf-8") as fh:
+        config = yaml.safe_load(fh) or {}
+    section = config.get("cache")
+    if not isinstance(section, dict):
+        raise ConfigError("config key 'cache' must be a mapping")
+    directory = section.get("dir")
+    if not isinstance(directory, str) or not directory:
+        raise ConfigError("config key 'cache.dir' must be a non-empty string")
+    path = Path(directory)
+    return path if path.is_absolute() else config_path.resolve().parent / path
 
 
 def api_key_from_env(config: ModelConfig) -> str:
@@ -194,6 +236,7 @@ class VerifierClient:
         prompts: PromptBundle,
         log_path: Path,
         *,
+        cache_dir: Path | None = None,
         sleep: Any = time.sleep,
     ) -> None:
         self.config = config
@@ -201,13 +244,39 @@ class VerifierClient:
         self.prompts = prompts
         self.log_path = Path(log_path)
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
+        self.cache_dir = None if cache_dir is None else Path(cache_dir)
         self._sleep = sleep
         self._cache: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
+        if self.cache_dir is not None:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            self._load_disk_cache()
 
     # ------------------------------------------------------------------ #
     # Cache / logging helpers
     # ------------------------------------------------------------------ #
+    def _load_disk_cache(self) -> None:
+        assert self.cache_dir is not None
+        for path in sorted(self.cache_dir.glob("*.json")):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise ConfigError(f"unreadable cache entry {path}: {exc}") from exc
+            key = payload.pop("key", None)
+            if not isinstance(key, str) or not key:
+                raise ConfigError(f"cache entry {path} has no 'key'")
+            self._cache[key] = payload
+
+    def _disk_store(self, key: str, entry: dict[str, Any]) -> None:
+        assert self.cache_dir is not None
+        target = self.cache_dir / f"{key}.json"
+        temporary = self.cache_dir / f".{key}.json.tmp"
+        temporary.write_text(
+            json.dumps({"key": key, **entry}, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, target)
+
     def _cache_key(self, user_prompt: str, sample_idx: int) -> str:
         payload = [
             self.config.model,
@@ -254,6 +323,8 @@ class VerifierClient:
         cached: bool,
         attempts: int,
         is_result: bool,
+        finish_reason: str | None = None,
+        order_seed: Any = None,
         error: str | None = None,
     ) -> dict[str, Any]:
         row = {
@@ -261,6 +332,7 @@ class VerifierClient:
             "condition": condition,
             "model": self.config.model,
             "sample_idx": sample_idx,
+            "order_seed": order_seed,
             "config_hash": self.config.config_hash,
             "system_prompt_sha256": self.prompts.system_sha256,
             "user_prompt_sha256": user_prompt_sha256,
@@ -270,6 +342,8 @@ class VerifierClient:
             "rationale": parsed["rationale"] if parsed else None,
             "evidence_concerns": parsed["evidence_concerns"] if parsed else None,
             "raw_response": raw_response,
+            "finish_reason": finish_reason,
+            "finish_reason_last": finish_reason,
             "tokens": {"input": input_tokens, "output": output_tokens},
             "latency_ms": latency_ms,
             "attempt_idx": attempt_idx,
@@ -298,10 +372,11 @@ class VerifierClient:
         evidence_sentences: list[dict[str, Any]],
         sample_idx: int = 0,
         condition: str | None = None,
+        order_seed: Any = None,
     ) -> dict[str, Any]:
         """Run one verifier call (with retries/cache) and log the result."""
         claim_text, claim_tags = escape_tags(claim)
-        evidence_raw = " ".join(sentence["text"] for sentence in evidence_sentences)
+        evidence_raw = render_evidence(evidence_sentences)
         evidence_text, evidence_tags = escape_tags(evidence_raw)
         escapes = [
             {"claim_id": claim_id, "field": "claim", "tag": tag} for tag in claim_tags
@@ -337,12 +412,16 @@ class VerifierClient:
                 cached=True,
                 attempts=cached_entry["attempts"],
                 is_result=True,
+                finish_reason=cached_entry.get("finish_reason"),
+                order_seed=order_seed,
             )
             self._log(row)
             return row
 
         attempts = 0
         first_attempt_outcome: str | None = None
+        retry_api = "api_error" in self.config.retry_on
+        retry_parse = "parse_failure" in self.config.retry_on
         thinking = ThinkingConfig(
             enabled=self.config.thinking_enabled,
             budget_tokens=self.config.thinking_budget_tokens,
@@ -350,7 +429,7 @@ class VerifierClient:
         while True:
             attempt_idx = attempts
             call_error: Exception | None = None
-            retryable = False
+            retryable_type = False
             try:
                 result = self.backend.complete(
                     self.prompts.system,
@@ -362,7 +441,7 @@ class VerifierClient:
                 )
             except (RateLimitError, ServerError, BackendTimeout) as exc:
                 call_error = exc
-                retryable = True
+                retryable_type = True
             except BackendError as exc:
                 call_error = exc
 
@@ -370,6 +449,7 @@ class VerifierClient:
                 outcome = "api_error"
                 if first_attempt_outcome is None:
                     first_attempt_outcome = outcome
+                retryable = retryable_type and retry_api
                 is_final = (not retryable) or attempts >= self.config.max_retries
                 row = self._row(
                     claim_id=claim_id,
@@ -390,6 +470,8 @@ class VerifierClient:
                     cached=False,
                     attempts=attempts,
                     is_result=is_final,
+                    finish_reason=None,
+                    order_seed=order_seed,
                     error=str(call_error),
                 )
                 self._log(row)
@@ -405,7 +487,9 @@ class VerifierClient:
                 outcome = "parse_failure"
                 if first_attempt_outcome is None:
                     first_attempt_outcome = outcome
-                is_final = attempts >= self.config.max_retries
+                # A parse failure is an outcome, not a transport accident: it is
+                # retried only when the config explicitly lists it.
+                is_final = (not retry_parse) or attempts >= self.config.max_retries
                 row = self._row(
                     claim_id=claim_id,
                     condition=condition,
@@ -425,6 +509,8 @@ class VerifierClient:
                     cached=False,
                     attempts=attempts,
                     is_result=is_final,
+                    finish_reason=result.finish_reason,
+                    order_seed=order_seed,
                 )
                 self._log(row)
                 if is_final:
@@ -435,6 +521,22 @@ class VerifierClient:
             outcome = "ok"
             if first_attempt_outcome is None:
                 first_attempt_outcome = outcome
+            entry = {
+                "parsed": parsed,
+                "raw": result.text,
+                "input_tokens": result.input_tokens,
+                "output_tokens": result.output_tokens,
+                "latency_ms": result.latency_ms,
+                "finish_reason": result.finish_reason,
+                "attempt_idx": attempt_idx,
+                "total_attempts": attempt_idx + 1,
+                "first_attempt_outcome": first_attempt_outcome,
+                "attempts": attempts,
+            }
+            with self._lock:
+                self._cache[key] = entry
+                if self.cache_dir is not None:
+                    self._disk_store(key, entry)
             row = self._row(
                 claim_id=claim_id,
                 condition=condition,
@@ -454,24 +556,25 @@ class VerifierClient:
                 cached=False,
                 attempts=attempts,
                 is_result=True,
+                finish_reason=result.finish_reason,
+                order_seed=order_seed,
             )
-            with self._lock:
-                self._cache[key] = {
-                    "parsed": parsed,
-                    "raw": result.text,
-                    "input_tokens": result.input_tokens,
-                    "output_tokens": result.output_tokens,
-                    "latency_ms": result.latency_ms,
-                    "attempt_idx": attempt_idx,
-                    "total_attempts": attempt_idx + 1,
-                    "first_attempt_outcome": first_attempt_outcome,
-                    "attempts": attempts,
-                }
             self._log(row)
             return row
 
-    def run_batch(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Run independent verify() calls with bounded concurrency."""
+    def run_batch(
+        self, items: list[dict[str, Any]], order_seed: Any
+    ) -> list[dict[str, Any]]:
+        """Run verify() calls in a seeded shuffle, logging order_seed in every row.
+
+        The shuffle spans all conditions in ``items``; passing the same seed
+        reproduces the same execution order.
+        """
+        ordered = [dict(item) for item in items]
+        random.Random(order_seed).shuffle(ordered)
         with ThreadPoolExecutor(max_workers=self.config.concurrency) as pool:
-            futures = [pool.submit(self.verify, **item) for item in items]
+            futures = [
+                pool.submit(self.verify, **{**item, "order_seed": order_seed})
+                for item in ordered
+            ]
             return [future.result() for future in futures]

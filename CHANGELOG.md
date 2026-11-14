@@ -4,6 +4,46 @@ Changes to `SPEC.md` are recorded here with their reason, per SPEC §7. The §3/
 changes below were made before any experiment result existed; the TASK A2 entry
 above is the first result and records that ordering.
 
+## 2026-11-14 — TASK A2 rerun result (keep 0.7)
+
+**Run.** 60 calls (30 at T=0.7, 30 at T=1.0), same 6 claims, k=5, normal `VerifierClient` with no
+wrappers; logs `smoke/raw/`, cache `smoke/cache/`. All 60 attempts returned `finish_reason=stop`,
+all outcomes `ok`, no retries, 0 cache hits. Cost 36,342 tokens (31,360 input / 4,982 output).
+
+**Decision applied.** First decision-table row fires: 6/6 claims have >=2 distinct confidence
+values at T=0.7 and 0/6 show a verdict change. This is also the "only confidence varies" case, so
+the stability is confidence-driven. **0.7 is kept; temperature was not changed.**
+
+**Side by side with the VOID run.** Total distinct (verdict, confidence) pairs: 0.7 — void 19,
+rerun 17; 1.0 — void 19, rerun 21. Per-claim verdict distributions differ only on
+`s_8eb99f781d` (gold SUPPORT): the void run flipped to SUPPORTED once at each temperature, the
+rerun flipped once at 1.0 only. Every other claim kept one verdict at both temperatures in both
+runs. VOID rows predate the `finish_reason` field; all 60 rerun rows say `stop`.
+
+**Report.** `smoke/report.md`.
+
+## 2026-11-14 — TASK A2 rerun: rules recorded before the first call
+
+**Decision table (recorded 2026-11-14, applies unchanged to this rerun).**
+
+> T=0.7 shows >=2 distinct confidence values or any verdict change on most claims -> keep 0.7.
+> Only confidence varies -> keep 0.7, note that stability is confidence-driven.
+> No variation at 0.7 and 1.0 -> report, change nothing, wait for human.
+> No variation at 0.7 but variation at 1.0 -> report, wait for human before changing temperature.
+
+**Rules for this rerun (written before any call).**
+
+- The rerun may confirm 0.7, or trigger "report and wait for human". It may not change the
+  temperature by itself.
+- Same 6 claims (`smoke/claims.jsonl`), k=5 per claim, T=0.7 and T=1.0, through the normal
+  `VerifierClient` with no wrappers, logs in `smoke/raw/` and cache in `smoke/cache/`.
+- Both runs — the 2026-11-14 VOID run and this rerun — are reported side by side.
+- `finish_reason` is expected to be `stop` on every call; any other value is reported.
+
+**Prerequisite note.** The Task B call layer existed in the working tree but was not committed
+when this rerun started, so the earlier "run only after Task B is merged and committed"
+condition is met in working-tree form only, not by a commit.
+
 ## 2026-11-14 — TASK A2 smoke run executed before `spec-frozen` (VOID; re-run after Task B)
 
 **Status: VOID.** At the human's direction (void existing run, re-run after Task B), these 60

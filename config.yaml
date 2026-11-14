@@ -42,6 +42,10 @@ pilot:
 smoke:
   seed: 20261115
 
+# Persistent response cache (SPEC §7). Relative paths resolve against this file.
+cache:
+  dir: cache
+
 # Main subject (SPEC §3). Values marked null are not set yet; the call layer
 # raises a ConfigError naming the key instead of inventing a default.
 models:
@@ -57,6 +61,9 @@ models:
       budget_tokens: null
     concurrency: 4       # operational default, not a scientific setting; change freely
     max_retries: 2
+    # Retry policy (SPEC v1.1): only listed outcomes are retried. The main run
+    # retries API errors only; a parse failure is an outcome and is not retried.
+    retry_on: [api_error]
     # Official pricing (accessed 2026-11-14):
     # https://api-docs.deepseek.com/quick_start/pricing
     # deepseek-flash: input $0.15 off-peak / $0.30 peak per 1M tokens,
