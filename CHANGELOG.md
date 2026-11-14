@@ -4,6 +4,19 @@ Changes to `SPEC.md` are recorded here with their reason, per SPEC §7. The §3/
 changes below were made before any experiment result existed; the TASK A2 entry
 above is the first result and records that ordering.
 
+## 2026-11-14 — SPEC v1.3.1: restore study-level result, rename row-level term
+
+Terminology split: "result" is the study-level unit (any output from a subject model, the thing the
+freeze rule and infrastructure-check exemption talk about); "result row" is the row-level record
+analyzed per (claim, condition, sample_idx). The §7 study-level sentence removed by v1.3 is
+restored verbatim, and the row bullet now reads "A row is a RESULT ROW iff ...". The row-level
+sentences that said "the result" now say "the result row" or "the row analyzed".
+
+Reason: the v1.3 edit removed the study-level definition, leaving "result" doing both jobs. No
+main-run result exists yet, so the terminology is fixed before the first one.
+
+SPEC SHA-256: `e83cfe2e4c91d527c33f8922dbf1b57e0a8d2148e9ec13a4011814e6dfac8dd9`
+
 ## 2026-11-14 — SPEC v1.3: cache key, result definition, no_verdict
 
 SPEC sections 6 and 7 amended after the callayer-v2 review. Reason: C0' replayed C0 from the

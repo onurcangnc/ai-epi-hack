@@ -139,15 +139,16 @@ Generator note (M3-M5): unchanged.
   A cache replay is logged with is_result=false.
 - Raw responses, prompts, frozen generated data and configs are hashed and kept.
 - A change to this spec after results exist is logged in CHANGELOG.md with the reason.
-- A row is a result iff its outcome is ok, parse_failure, blocked or truncated, or it is an
-  api_error after the retry budget and both resume passes are exhausted. Only finish_reason "stop"
-  can be ok. 401/402/403 abort the run. The first result row per (claim, condition, sample_idx) is
-  the result.
+- A "result" is any output from any subject model, pilot included, except infrastructure checks.
   A check qualifies as infrastructure only if its prompts contain no dataset claim or evidence text;
   such checks are not results and informed no analysis choice. Before the first result, section 5,
   section 6, config.yaml and the analysis scripts are hashed and committed (tag spec-frozen).
   Later changes produce a separate analysis labeled exploratory; the frozen analysis stays primary.
-- The first complete row per (claim, condition, sample_idx) is the result; later rows are replications.
+- A row is a RESULT ROW iff its outcome is ok, parse_failure, blocked or truncated, or it is an
+  api_error after the retry budget and both resume passes are exhausted. Only finish_reason "stop"
+  can be ok. 401/402/403 abort the run. The first result row per (claim, condition, sample_idx) is
+  the row analyzed.
+- The first complete row per (claim, condition, sample_idx) is the result row; later rows are replications.
 - Main run: parse failures are NOT retried (they are an outcome); API errors are retried.
 - The warning in the verifier system prompt is an exempt, documented design choice (it primes
   every condition equally); it is not a leak.
