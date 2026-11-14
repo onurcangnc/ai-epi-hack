@@ -16,7 +16,6 @@ import sys
 import threading
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -47,6 +46,7 @@ BLOCKED_FINISH_REASONS = frozenset(
     {"content_filter", "insufficient_system_resource"}
 )
 MAX_BACKOFF_SECONDS = 60.0
+RETRY_AFTER_MAX_SECONDS = 900.0
 CACHE_REPLACE_ATTEMPTS = 3
 
 
@@ -60,6 +60,10 @@ class RunAborted(Exception):
     def __init__(self, status: int, message: str) -> None:
         super().__init__(redact(message))
         self.status = status
+
+
+class StateError(Exception):
+    """The cache and the log disagree; refuse to run until that is resolved."""
 
 
 def _non_null(value: Any, key: str) -> Any:
@@ -104,6 +108,7 @@ class ModelConfig:
     concurrency: int
     max_retries: int
     retry_on: tuple[str, ...]
+    blocked_body_markers: tuple[str, ...]
     price_table: dict[str, float] | None
 
     @property
@@ -162,6 +167,15 @@ class ModelConfig:
             )
         retry_on = tuple(dict.fromkeys(retry_on))
 
+        markers = section.get("blocked_body_markers") or []
+        if not isinstance(markers, list) or not all(
+            isinstance(marker, str) and marker for marker in markers
+        ):
+            raise ConfigError(
+                "config key 'models.deepseek.blocked_body_markers' must be a list of non-empty strings"
+            )
+        blocked_body_markers = tuple(markers)
+
         thinking = section.get("thinking")
         if not isinstance(thinking, dict):
             raise ConfigError("config key 'models.deepseek.thinking' must be a mapping")
@@ -209,6 +223,7 @@ class ModelConfig:
             concurrency=concurrency,
             max_retries=max_retries,
             retry_on=retry_on,
+            blocked_body_markers=blocked_body_markers,
             price_table=price_table,
         )
 
@@ -352,6 +367,9 @@ class VerifierClient:
             "base_url": self.config.base_url,
             "output_config": self.config.output_config(),
             "retry_on": list(self.config.retry_on),
+            "max_retries": self.config.max_retries,
+            "timeout": getattr(self.backend, "timeout", None),
+            "blocked_body_markers": list(self.config.blocked_body_markers),
             "system_prompt_sha256": self.prompts.system_sha256,
             "user_template_sha256": self.prompts.user_sha256,
             "user_prompt_sha256": _sha256(user_prompt),
@@ -542,6 +560,39 @@ class VerifierClient:
                     call_error = exc
 
                 if call_error is not None:
+                    status = getattr(call_error, "status", None)
+                    body = getattr(call_error, "body", None) or ""
+                    if (
+                        status is not None
+                        and 400 <= status < 500
+                        and not isinstance(
+                            call_error, (RateLimitError, ServerError, BackendTimeout)
+                        )
+                    ):
+                        marked = any(
+                            marker.lower() in str(body).lower()
+                            for marker in self.config.blocked_body_markers
+                        )
+                        row = self._row(
+                            claim_id=claim_id, condition=condition,
+                            sample_idx=sample_idx, cache_key=key,
+                            user_prompt=user_prompt,
+                            user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                            outcome="blocked" if marked else "api_error",
+                            raw_response=str(body) if marked else None,
+                            parsed=None,
+                            attempt_idx=attempt_idx,
+                            total_attempts=attempt_idx + 1,
+                            first_attempt_outcome=first_attempt_outcome or (
+                                "blocked" if marked else "api_error"
+                            ),
+                            used_attempt_idx=attempt_idx, attempts=attempt_idx,
+                            is_result=marked, finish_reason=None,
+                            http_status=status, order_seed=order_seed,
+                            resume_pass=resume_pass, error=str(call_error),
+                        )
+                        self._log(row)
+                        return row
                     outcome = "api_error"
                     if first_attempt_outcome is None:
                         first_attempt_outcome = outcome
@@ -567,12 +618,12 @@ class VerifierClient:
                         )
                         attempt_idx += 1
                         delay = (
-                            call_error.retry_after
+                            min(RETRY_AFTER_MAX_SECONDS, call_error.retry_after)
                             if isinstance(call_error, RateLimitError)
                             and call_error.retry_after is not None
                             else _backoff_seconds(attempt_idx)
                         )
-                        self._sleep(min(MAX_BACKOFF_SECONDS, delay))
+                        self._sleep(delay)
                         continue
                     row = self._row(
                         claim_id=claim_id, condition=condition,
@@ -652,6 +703,30 @@ class VerifierClient:
                         used_attempt_idx=attempt_idx, attempts=attempt_idx,
                         is_result=True, finish_reason=finish_reason,
                         order_seed=order_seed, resume_pass=resume_pass,
+                    )
+                    self._log(row)
+                    return row
+
+                if not isinstance(result.text, str):
+                    # No string content = the provider returned no reply. This is
+                    # an API failure, not the model's non-compliance, and it stays
+                    # resume-eligible rather than becoming a result row.
+                    row = self._row(
+                        claim_id=claim_id, condition=condition,
+                        sample_idx=sample_idx, cache_key=key,
+                        user_prompt=user_prompt,
+                        user_prompt_sha256=user_prompt_sha256, escapes=escapes,
+                        outcome="api_error", raw_response=None, parsed=None,
+                        result=result,
+                        input_tokens=result.input_tokens,
+                        output_tokens=result.output_tokens,
+                        latency_ms=result.latency_ms,
+                        attempt_idx=attempt_idx, total_attempts=attempt_idx + 1,
+                        first_attempt_outcome=first_attempt_outcome or "api_error",
+                        used_attempt_idx=attempt_idx, attempts=attempt_idx,
+                        is_result=False, finish_reason=finish_reason,
+                        order_seed=order_seed, resume_pass=resume_pass,
+                        error="response carried no string content",
                     )
                     self._log(row)
                     return row
@@ -827,15 +902,31 @@ class VerifierClient:
         random.Random(order_seed).shuffle(ordered)
 
         done = self._finished_cache_keys()
+        recorded = self._recorded_result_rows()
+        self._assert_cache_matches_log(recorded)
+        rows_by_key: dict[str, dict[str, Any]] = dict(recorded)
         pending = [item for item in ordered if self._unit_cache_key(item) not in done]
 
-        rows_by_key: dict[str, dict[str, Any]] = {}
+        consecutive_4xx = 0
         for item in pending:
             row = self.verify(
                 **item, order_seed=order_seed, resume_pass=0,
                 is_last_pass=(resume_passes == 0),
             )
             rows_by_key[row["cache_key"]] = row
+            status = row.get("http_status")
+            if (
+                row["outcome"] == "api_error"
+                and isinstance(status, int)
+                and 400 <= status < 500
+            ):
+                consecutive_4xx += 1
+            else:
+                consecutive_4xx = 0
+            if consecutive_4xx >= 3:
+                raise RunAborted(
+                    int(status), "three consecutive unmarked 4xx responses"
+                )
 
         for pass_index in range(1, resume_passes + 1):
             failing = [
@@ -857,6 +948,35 @@ class VerifierClient:
             for key in (self._unit_cache_key(item) for item in items)
             if key in rows_by_key
         ]
+
+    def _assert_cache_matches_log(self, recorded: dict[str, dict[str, Any]]) -> None:
+        """Every cached key must be accounted for by a result row in this log."""
+        with self._state_lock:
+            unaccounted = [key for key in self._cache if key not in recorded]
+        if unaccounted:
+            raise StateError(
+                f"cache has {len(unaccounted)} key(s) with no result row in "
+                f"{self.log_path}; refusing to run (first: {unaccounted[0]})"
+            )
+
+    def _recorded_result_rows(self) -> dict[str, dict[str, Any]]:
+        """The first result row per cache key, read from the log (SPEC §7)."""
+        recorded: dict[str, dict[str, Any]] = {}
+        if not self.log_path.is_file():
+            return recorded
+        with self.log_path.open(encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    continue
+                key = row.get("cache_key")
+                if row.get("is_result") and key and key not in recorded:
+                    recorded[str(key)] = row
+        return recorded
 
     def _finished_cache_keys(self) -> set[str]:
         done: set[str] = set()

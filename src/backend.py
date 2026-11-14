@@ -26,9 +26,12 @@ def redact(text: str) -> str:
 class BackendError(Exception):
     """Base class for backend failures (non-retryable unless subclassed)."""
 
-    def __init__(self, message: str, status: int | None = None) -> None:
+    def __init__(
+        self, message: str, status: int | None = None, body: str | None = None
+    ) -> None:
         super().__init__(message)
         self.status = status
+        self.body = body
 
 
 class AuthError(BackendError):
@@ -172,7 +175,9 @@ class DeepSeekBackend:
             raise ServerError(status, f"server error {status}: {response.text[:500]}")
         if status >= 400:
             raise BackendError(
-                redact(f"request rejected {status}: {response.text[:500]}"), status
+                redact(f"request rejected {status}: {response.text[:500]}"),
+                status,
+                response.text,
             )
 
         try:

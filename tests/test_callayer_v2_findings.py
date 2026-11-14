@@ -428,9 +428,7 @@ def test_f03_malformed_key_never_reaches_the_log_or_an_exception(tmp_path):
 @pytest.mark.parametrize(
     "content, finish_reason",
     [
-        pytest.param(None, "stop", id="null-content-stop"),
         pytest.param(None, "length", id="null-content-length"),
-        pytest.param([{"type": "image_url", "image_url": {"url": "x"}}], "stop", id="non-text-parts"),
     ],
 )
 def test_f04_non_string_content_becomes_a_logged_failure(tmp_path, content, finish_reason):
@@ -439,6 +437,56 @@ def test_f04_non_string_content_becomes_a_logged_failure(tmp_path, content, fini
     assert row["outcome"] != "ok"
     assert row["verdict"] is None
     assert len(result_rows(tmp_path / "calls.jsonl")) == 1
+
+
+# The "null-content-stop" and "non-text-parts" cases moved out of the test above
+# when the contract changed on purpose: finding 5 of the callayer-v3 review was
+# accepted, so a reply the provider sent with no text at all is infrastructure,
+# not the model's non-compliance. It carries outcome "api_error" and stays
+# resume-eligible instead of being frozen as a parse failure.
+#
+# Everything the old cases protected is kept: verify() does not raise, exactly
+# one row is logged for the call, the outcome is not "ok", and the raw reply
+# survives. "Exactly one row" is now counted over every logged row rather than
+# over result rows, because is_result is False here - which also pins that an
+# absent reply is recorded once and handed to a resume pass, not retried inside
+# the call. The "null-content-length" case above is unchanged: a provider cut
+# with finish_reason "length" stays a truncated result row.
+ABSENT_TEXT = [
+    pytest.param(None, "null", id="null-content-stop"),
+    pytest.param(
+        [{"type": "image_url", "image_url": {"url": "x"}}], "image_url", id="non-text-parts"
+    ),
+]
+
+
+@pytest.mark.parametrize("content, raw_marker", ABSENT_TEXT)
+def test_f04_absent_text_is_an_infrastructure_failure(tmp_path, content, raw_marker):
+    backend, _ = http_backend([http_reply(body=completion_body(content, "stop"))] * 3)
+    row = make_client(tmp_path, backend).verify(**CALL)
+    assert row["outcome"] == "api_error", f"absent text recorded as {row['outcome']!r}"
+    assert row["is_result"] is False
+    assert row["outcome"] != "ok"
+    assert row["verdict"] is None
+    assert isinstance(row["raw_response"], str) and raw_marker in row["raw_response"], (
+        f"the paid reply was dropped instead of recorded: {row['raw_response']!r}"
+    )
+    assert len(read_log(tmp_path / "calls.jsonl")) == 1
+
+
+@pytest.mark.parametrize("content, raw_marker", ABSENT_TEXT)
+def test_f04_absent_text_leaves_one_result_row_after_the_resume_passes(
+    tmp_path, content, raw_marker
+):
+    """run_batch level: however many passes retry an absent reply, the unit ends with
+    exactly one result row under one cache key, so its failure stays in the k=5
+    denominator (SPEC 6) instead of vanishing from it or being counted twice."""
+    backend, _ = http_backend([http_reply(body=completion_body(content, "stop"))] * 12)
+    make_client(tmp_path, backend).run_batch([CALL], order_seed=1)
+    per_key = Counter(
+        entry["cache_key"] for entry in read_log(tmp_path / "calls.jsonl") if entry["is_result"]
+    )
+    assert list(per_key.values()) == [1], f"result rows per cache key: {dict(per_key)}"
 
 
 @pytest.mark.parametrize(

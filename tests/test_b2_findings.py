@@ -282,11 +282,12 @@ def test_stop_and_valid_json_is_ok(tmp_path):
 # Finding 4: hostile payloads become parse_failure without losing rows
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("bad", [None, ["not", "a", "string"]])
-def test_non_string_content_is_parse_failure(tmp_path, bad):
+def test_non_string_content_is_an_api_error(tmp_path, bad):
     client, _, _ = make_client(tmp_path, [result(bad, "stop")])
     row = call(client)
-    assert row["outcome"] == "parse_failure"
+    assert row["outcome"] == "api_error"
     assert row["verdict"] is None
+    assert row["is_result"] is False
     assert len(log_rows(tmp_path / "calls.jsonl")) == 1
 
 

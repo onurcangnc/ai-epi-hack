@@ -70,12 +70,15 @@ models:
     thinking:
       enabled: false
       budget_tokens: null
-    concurrency: 4       # operational default, not a scientific setting; change freely
+    concurrency: 4       # unused: run_batch is sequential; kept for config compatibility
     # 5 attempts = 4 retries, per SPEC v1.1 (exponential backoff, 60 s cap).
     max_retries: 4
     # Retry policy (SPEC v1.1): only listed outcomes are retried. The main run
     # retries API errors only; a parse failure is an outcome and is not retried.
     retry_on: [api_error]
+    # Provider bodies that mean a content refusal rather than a bad request
+    # (unverified wording; matched case-insensitively as a substring).
+    blocked_body_markers: ["content exists risk"]
     # Official pricing (accessed 2026-11-14):
     # https://api-docs.deepseek.com/quick_start/pricing
     # deepseek-flash: input $0.15 off-peak / $0.30 peak per 1M tokens,

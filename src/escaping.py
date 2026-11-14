@@ -12,7 +12,10 @@ import re
 
 TAGS = ("<claim>", "</claim>", "<evidence>", "</evidence>")
 
-_TAG_RE = re.compile(r"<\s*(/?)\s*(claim|evidence)\b[^>]*>", re.IGNORECASE)
+_ZERO_WIDTH = "\u200b\u200c\u200d\ufeff"
+_TAG_RE = re.compile(
+    r"<([\s/\\" + _ZERO_WIDTH + r"]*)(claim|evidence)\b[^>]*>", re.IGNORECASE
+)
 
 
 def escape_tag(tag: str) -> str:
@@ -28,7 +31,8 @@ def escape_tags(text: str, tags: tuple[str, ...] = TAGS) -> tuple[str, list[str]
     found: set[str] = set()
 
     def replace(match: re.Match[str]) -> str:
-        closing, name = match.group(1), match.group(2).lower()
+        prefix, name = match.group(1), match.group(2).lower()
+        closing = "/" in prefix
         canonical = f"</{name}>" if closing else f"<{name}>"
         if canonical in tags:
             found.add(canonical)
