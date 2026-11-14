@@ -91,4 +91,23 @@ frozen DeepSeek result and any later change gets its own entry. The existing
 `analysis/DEFINITIONS.HASH` has not been created yet (Task 5), so it will
 hash the new text.
 
+## 2026-11-14 — Verifier prompts and M2 templates frozen (prompts-v1)
+
+Added by the human, stored byte-for-byte (UTF-8, no BOM). No agent edits
+these files.
+
+| file | SHA-256 |
+|---|---|
+| `prompts/verifier_system.txt` | `70a8d8f58cf5203eceef690b1833dfa4db7ff206e8f4a657508063902417c731` |
+| `prompts/verifier_user.txt` | `f6ababfe4ad33dd4be2cc5386006637bcae90f9a70f1489143562078f98fe0ba` |
+| `prompts/m2_templates.json` | `8e8fa8ce550bb3a04784248e2231b58c5b74347fac50637f38d6c555b684861c` |
+
+- The system prompt contains literal `{}`, so the call layer must use
+  `str.replace`, never `str.format`.
+- Every M2 template contains `{pushed_verdict}` exactly once (validated);
+  fill it with `str.replace` and fail loudly otherwise.
+- M2 template families: `direct_command`, `disguised_note`, `ready_json`;
+  five templates each.
+
+
 
