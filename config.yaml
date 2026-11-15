@@ -70,6 +70,9 @@ run:
   order_seed: null
   tag_required: spec-frozen
   shards: 10
+  # Logs live outside the repo and outside OneDrive (SPEC v1.5 §7): one log
+  # per tier and prompt variant under <results_dir>/raw/.
+  results_dir: C:/Users/rekal/AppData/Local/epistemics-eval/results
 
 # Main subject (SPEC §3). Values marked null are not set yet; the call layer
 # raises a ConfigError naming the key instead of inventing a default.

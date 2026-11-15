@@ -38,8 +38,11 @@ from verifier_client import (  # noqa: E402
 )
 
 NAIVE_SYSTEM = "verifier_system_naive.txt"
-WARNED_LOG = Path("results/raw/deepseek_warned.jsonl")
-NAIVE_LOG = Path("results/raw/deepseek_naive.jsonl")
+LOG_NAMES = {
+    "core": "core_warned.jsonl",
+    "extended": "extended_warned.jsonl",
+    "naive": "naive.jsonl",
+}
 PROGRESS_EVERY = 50
 WINDOW = 100
 MAX_API_ERRORS_IN_WINDOW = 20
@@ -171,8 +174,25 @@ def prompt_bundle(root: Path, tier: str) -> tuple[PromptBundle, bool]:
     )
 
 
+def results_dir_for(root: Path) -> Path:
+    """``run.results_dir`` resolved against the config file (SPEC v1.5 §7)."""
+    config_path = Path(root) / "config.yaml"
+    fallback = Path(root) / "results"
+    if not config_path.is_file():
+        return fallback
+    config = load_config_for(config_path)
+    value = (config.get("run") or {}).get("results_dir")
+    if not isinstance(value, str) or not value:
+        return fallback
+    path = Path(value)
+    return path if path.is_absolute() else config_path.resolve().parent / path
+
+
 def log_path_for(root: Path, tier: str) -> Path:
-    return root / (NAIVE_LOG if tier == "naive" else WARNED_LOG)
+    """One log per tier and prompt variant, under ``run.results_dir``."""
+    if tier not in LOG_NAMES:
+        raise ConfigError(f"unknown tier {tier!r}")
+    return results_dir_for(root) / "raw" / LOG_NAMES[tier]
 
 
 def cache_dir_for(root: Path, config_path: Path, tier: str) -> Path:
@@ -219,7 +239,7 @@ def dry_run(root: Path, config_path: Path, tier: str, shard: str | None = None) 
     bundle, missing_naive = prompt_bundle(root, tier)
     log_path = log_path_for(root, tier)
     per_condition: dict[str, int] = {}
-    for unit in selected:
+    for unit in units:
         per_condition[unit["condition"]] = per_condition.get(unit["condition"], 0) + 1
     done = done_keys(log_path)
     already = sum(
@@ -229,9 +249,10 @@ def dry_run(root: Path, config_path: Path, tier: str, shard: str | None = None) 
         "tier": tier,
         "shard": f"{index}/{count}",
         "units_per_condition": per_condition,
-        "total_calls": len(selected),
+        "total_calls": len(units),
+        "shard_calls": len(selected),
         "already_done": already,
-        "prompt_chars": None if missing_naive else prompt_chars(selected, bundle),
+        "prompt_chars": None if missing_naive else prompt_chars(units, bundle),
         "missing_naive_prompt": missing_naive,
         "log": str(log_path),
         "cache_dir": str(cache_dir_for(root, config_path, tier)),
@@ -269,9 +290,31 @@ def tag_is_ancestor(root: Path, tag: str) -> bool:
     return ancestor.returncode == 0
 
 
+SPEC_HASH_RE = re.compile(r"SPEC SHA-256: `([0-9a-f]{64})`")
+
+
 def latest_spec_hash(changelog_text: str) -> str | None:
-    match = re.search(r"SPEC SHA-256: `([0-9a-f]{64})`", changelog_text)
-    return match.group(1) if match else None
+    """The SPEC hash of the newest dated entry, wherever it sits.
+
+    Changelogs may be newest-first or newest-last; the date on the ``##``
+    heading decides. On a tie (more than one entry on the newest date) the
+    first entry in file order wins, which is the top of the file in both
+    conventions.
+    """
+    newest_date: str | None = None
+    newest_hash: str | None = None
+    for section in re.split(r"(?m)^## ", changelog_text)[1:]:
+        heading, _, body = section.partition("\n")
+        match = re.match(r"(\d{4}-\d{2}-\d{2})", heading.strip())
+        if not match:
+            continue
+        hashes = SPEC_HASH_RE.findall(body)
+        if not hashes:
+            continue
+        if newest_date is None or match.group(1) > newest_date:
+            newest_date = match.group(1)
+            newest_hash = hashes[-1]
+    return newest_hash
 
 
 def spec_hash_matches(root: Path) -> bool:
@@ -294,22 +337,80 @@ def read_hash_file(path: Path) -> list[tuple[str, str]]:
     return rows
 
 
+# Files the build scripts write beside the frozen data: documentation and
+# derived sidecars that SPEC v1.5 §7 does not freeze. The manifest must cover
+# every other file in its own directory, so deleting rows cannot pass.
+NOT_FROZEN_DATA = frozenset(
+    {
+        "HASHES.txt",
+        "DATA_REPORT.md",
+        "README.md",
+        "conditions_meta.json",
+        "skips.jsonl",
+        "m1_overlap_screen.jsonl",
+    }
+)
+
+
 def hash_file_matches(root: Path, path: Path) -> bool:
+    """Every listed file must match, and the list must cover its directory."""
     if not path.is_file():
         return False
-    for digest, relative in read_hash_file(path):
+    rows = read_hash_file(path)
+    if not rows:
+        return False
+    covered: set[str] = set()
+    for digest, relative in rows:
         target = root / relative
         if not target.is_file():
             return False
         if hashlib.sha256(target.read_bytes()).hexdigest() != digest:
             return False
-    return True
+        covered.add(Path(relative).name)
+    siblings = {
+        child.name
+        for child in path.parent.iterdir()
+        if child.is_file() and child.name not in NOT_FROZEN_DATA
+    }
+    return covered == siblings
 
 
 def hash_files_match(root: Path) -> bool:
     return hash_file_matches(root, root / "data" / "conditions" / "HASHES.txt") and hash_file_matches(
         root, root / "data" / "HASHES.txt"
     )
+
+
+ANALYSIS_HASH = "ANALYSIS.HASH"
+ANALYSIS_DIRS = ("analysis", "src", "prompts")
+ANALYSIS_FILES = ("config.yaml", "scripts/run_experiment.py")
+
+
+def analysis_hash_targets(root: Path) -> list[str]:
+    """Every frozen analysis surface file (SPEC v1.5 §7)."""
+    targets = list(ANALYSIS_FILES)
+    for directory in ANALYSIS_DIRS:
+        for path in sorted((root / directory).rglob("*")):
+            if path.is_file() and "__pycache__" not in path.parts:
+                targets.append(path.relative_to(root).as_posix())
+    return targets
+
+
+def analysis_hash_matches(root: Path) -> bool:
+    """ANALYSIS.HASH covers the frozen surface and every digest still holds."""
+    manifest = root / ANALYSIS_HASH
+    if not manifest.is_file():
+        return False
+    listed = {relative: digest for digest, relative in read_hash_file(manifest)}
+    if not listed:
+        return False
+    for relative, digest in listed.items():
+        target = root / relative
+        if not target.is_file():
+            return False
+        if hashlib.sha256(target.read_bytes()).hexdigest() != digest:
+            return False
+    return all(target in listed for target in analysis_hash_targets(root))
 
 
 def prompt_hashes_match(root: Path) -> bool:
@@ -326,18 +427,54 @@ def prompt_hashes_match(root: Path) -> bool:
     return True
 
 
-def assert_guards(root: Path, config: dict[str, Any]) -> None:
+def guard_report(root: Path, config: dict[str, Any]) -> list[tuple[str, bool, str]]:
+    """One (name, passed, detail) row per frozen-state guard."""
     tag = run_config(config)["tag_required"]
-    checks = (
-        ("git tree is not clean", git_tree_clean(root)),
-        (f"tag {tag!r} is missing or not an ancestor of HEAD", tag_is_ancestor(root, tag)),
-        ("SPEC.md hash does not match the latest CHANGELOG value", spec_hash_matches(root)),
-        ("HASHES.txt files do not match their files", hash_files_match(root)),
-        ("prompt hashes do not match CHANGELOG", prompt_hashes_match(root)),
+    report: list[tuple[str, bool, str]] = []
+
+    clean = git_tree_clean(root)
+    report.append(
+        ("git tree is not clean", clean,
+         "clean" if clean else "uncommitted changes, or git is unavailable")
     )
-    errors = [message for message, ok in checks if not ok]
-    if errors:
-        raise GuardError("; ".join(errors))
+    ancestor = tag_is_ancestor(root, tag)
+    report.append(
+        (f"tag {tag!r} is missing or not an ancestor of HEAD", ancestor,
+         "tag reaches HEAD" if ancestor else f"tag {tag!r} does not reach HEAD")
+    )
+    spec_ok = spec_hash_matches(root)
+    report.append(
+        ("SPEC.md hash does not match the latest CHANGELOG value", spec_ok,
+         "SPEC.md matches the newest CHANGELOG entry" if spec_ok
+         else "SPEC.md differs from the newest CHANGELOG SPEC SHA-256")
+    )
+    data_ok = hash_files_match(root)
+    report.append(
+        ("HASHES.txt files do not match their files", data_ok,
+         "both data manifests cover their directories" if data_ok
+         else "a HASHES.txt row is stale, missing or does not cover its directory")
+    )
+    analysis_ok = analysis_hash_matches(root)
+    report.append(
+        ("ANALYSIS.HASH does not match the frozen analysis surface", analysis_ok,
+         "analysis surface matches ANALYSIS.HASH" if analysis_ok
+         else "ANALYSIS.HASH is missing, stale or incomplete")
+    )
+    prompts_ok = prompt_hashes_match(root)
+    report.append(
+        ("prompt hashes do not match CHANGELOG", prompts_ok,
+         "prompt hashes match" if prompts_ok
+         else "a prompts/ digest differs from CHANGELOG")
+    )
+    return report
+
+
+def assert_guards(root: Path, config: dict[str, Any]) -> None:
+    failures = [
+        f"{name}: {detail}" for name, ok, detail in guard_report(root, config) if not ok
+    ]
+    if failures:
+        raise GuardError("; ".join(failures))
 
 
 # --------------------------------------------------------------------------- #
@@ -383,11 +520,25 @@ def execute(
     return rows
 
 
+def check_guards(root: Path, config: dict[str, Any]) -> int:
+    """Print each guard PASS/FAIL with its reason; build no API client."""
+    failures = 0
+    for name, ok, detail in guard_report(root, config):
+        print(f"{'PASS' if ok else 'FAIL'}  {name}: {detail}")
+        failures += 0 if ok else 1
+    print("all guards passed" if failures == 0 else f"{failures} guard(s) failed")
+    return 0 if failures == 0 else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tier", choices=("core", "extended", "naive"), default="core")
     parser.add_argument("--shard", default=None, help="i/n; default is shard 1/n")
     parser.add_argument("--confirm", action="store_true", help="execute a real run")
+    parser.add_argument(
+        "--check-guards", action="store_true",
+        help="print each frozen-state guard PASS/FAIL with its reason and exit",
+    )
     parser.add_argument("--config", type=Path, default=_ROOT / "config.yaml")
     args = parser.parse_args(argv)
 
@@ -396,6 +547,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         config = load_config_for(config_path)
         section = run_config(config)
+        if args.check_guards:
+            return check_guards(root, config)
         index, count = parse_shard(args.shard, section["shards"])
         if not args.confirm:
             print(json.dumps(dry_run(root, config_path, args.tier, args.shard), indent=2))

@@ -22,12 +22,18 @@ CONDITIONS = ("C0", "C0p", "C1", "C2", "M1", "M2", "C_closed")
 NO_VERDICT_OUTCOMES = frozenset({"parse_failure", "blocked", "truncated", "api_error"})
 
 
-def first_result_rows(raw_dir: Path) -> list[dict[str, Any]]:
-    """First is_result row per key, across the raw JSONL files in name order."""
+def first_result_rows(log_path: Path) -> list[dict[str, Any]]:
+    """First is_result row per key in ONE named log (SPEC v1.5 section 7).
+
+    A directory is still accepted for callers that hold exactly one log; it is
+    read in name order inside that one directory, never across tiers.
+    """
     rows: list[dict[str, Any]] = []
     seen: set[tuple[str, str, int]] = set()
-    for path in sorted(Path(raw_dir).glob("*.jsonl")):
-        for row in read_jsonl(path):
+    path = Path(log_path)
+    paths = sorted(path.glob("*.jsonl")) if path.is_dir() else [path]
+    for log in paths:
+        for row in read_jsonl(log):
             if not row.get("is_result"):
                 continue
             key = (str(row["claim_id"]), str(row["condition"]), int(row["sample_idx"]))
@@ -62,6 +68,8 @@ def load_flags(path: Path | None) -> dict[str, dict[str, Any]]:
 
 
 def _majority(verdicts: list[str | None]) -> str | None:
+    if len(verdicts) != 5:  # SPEC v1.5 §6: five rows or no majority
+        return None
     counts: dict[str, int] = {}
     for verdict in verdicts:
         if verdict is None:

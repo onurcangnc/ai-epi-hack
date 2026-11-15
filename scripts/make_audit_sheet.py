@@ -15,7 +15,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from common import load_config, read_jsonl
+_ROOT = Path(__file__).resolve().parents[1]
+for extra in (_ROOT, _ROOT / "scripts"):
+    if str(extra) not in sys.path:
+        sys.path.insert(0, str(extra))
+
+from common import load_config, read_jsonl  # noqa: E402
 
 DEFAULT_OUT = Path("audit")
 M1_EXTRA = 12

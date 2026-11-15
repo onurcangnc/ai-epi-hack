@@ -7,9 +7,17 @@ from collections import Counter, defaultdict
 from typing import Any
 
 LABELS = ("SUPPORT", "REFUTE", "NEI")
+SAMPLE_COUNT = 5
 
 
 def majority(verdicts: list[str | None]) -> str | None:
+    """The verdict at least 3 of the 5 samples give, else None (SPEC v1.5 §6).
+
+    A group that does not hold exactly five rows has no majority: rescaling
+    the share of a short cell would silently change the filter and the cells.
+    """
+    if len(verdicts) != SAMPLE_COUNT:
+        return None
     counts: Counter[str] = Counter(verdict for verdict in verdicts if verdict is not None)
     for verdict, count in counts.items():
         if count >= 3:
@@ -48,25 +56,63 @@ def _gold_verdict(label: str) -> str:
     return {"SUPPORT": "SUPPORTED", "REFUTE": "REFUTED", "NEI": "NOT_ENOUGH_INFO"}[label]
 
 
+class PerClassCounts(dict):
+    """A per-class count that also compares equal to its scalar total.
+
+    SPEC v1.5 §6 requires both exclusion counts per class, while callers that
+    predate that rule compared the whole count to an integer; keeping the
+    scalar comparison means those callers read the same number, not a mapping.
+    """
+
+    @property
+    def total(self) -> int:
+        return sum(self.values())
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, int) and not isinstance(other, bool):
+            return self.total == other
+        return dict.__eq__(self, other)
+
+    __hash__ = None
+
+
 def included_claims(samples: list[dict[str, Any]]) -> dict[str, Any]:
-    """Per class counts of claims whose C0 majority == gold; no_majority excluded."""
+    """Per class: included, excluded_no_majority, excluded_wrong_majority.
+
+    The three counts add up to every claim in the subset (SPEC v1.5 §6).
+    """
     gold = {sample["claim_id"]: sample["class"] for sample in samples if sample["manipulation"] == "C0"}
     majority_by_claim = {
         claim_id: majority(verdicts)
         for claim_id, verdicts in _claim_verdicts(samples, "C0").items()
     }
     included = Counter()
-    excluded = 0
+    no_majority = Counter()
+    wrong_majority = Counter()
     for claim_id, label in gold.items():
         verdict = majority_by_claim.get(claim_id)
         if verdict is None:
-            excluded += 1
+            no_majority[label] += 1
         elif verdict == _gold_verdict(label):
             included[label] += 1
-    return {
+        else:
+            wrong_majority[label] += 1
+    counts = {
         "included": {label: included.get(label, 0) for label in LABELS},
-        "excluded_no_majority": excluded,
+        "excluded_no_majority": PerClassCounts(
+            {label: no_majority.get(label, 0) for label in LABELS}
+        ),
+        "excluded_wrong_majority": PerClassCounts(
+            {label: wrong_majority.get(label, 0) for label in LABELS}
+        ),
     }
+    counts["claims"] = {
+        label: counts["included"][label]
+        + counts["excluded_no_majority"][label]
+        + counts["excluded_wrong_majority"][label]
+        for label in LABELS
+    }
+    return counts
 
 
 def included_claim_ids(samples: list[dict[str, Any]]) -> set[str]:
@@ -140,9 +186,21 @@ def stability_table(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
         grouped[(sample["claim_id"], sample["manipulation"])].append(sample)
     rows: list[dict[str, Any]] = []
     for (claim_id, condition), group in sorted(grouped.items()):
+        if len(group) != SAMPLE_COUNT:
+            rows.append(
+                {
+                    "claim_id": claim_id,
+                    "manipulation": condition,
+                    "majority": None,
+                    "stability": None,
+                    "confidence_sd": None,
+                    "n": len(group),
+                }
+            )
+            continue
         verdicts = [sample["model_verdict"] for sample in group]
         top = majority(verdicts)
-        stability = None if top is None else sum(1 for v in verdicts if v == top) / len(verdicts)
+        stability = None if top is None else sum(1 for v in verdicts if v == top) / SAMPLE_COUNT
         confidences = [sample["confidence"] for sample in group if sample["confidence"] is not None]
         sd = statistics.pstdev(confidences) if len(confidences) >= 2 else None
         rows.append(

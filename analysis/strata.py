@@ -209,26 +209,39 @@ def stability_spearman(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for key, values in grouped.items():
         mean_confidence[key] = mean(values)
 
-    cells = [row for row in stability_rows if row["stability"] is not None]
-    degenerate_share = (
-        sum(1 for row in cells if row["stability"] == 1.0) / len(cells) if cells else None
-    )
     rows = []
     for condition in sorted(group):
+        # Degeneracy is per condition (SPEC v1.5 §6); a degenerate condition
+        # has no usable stability variation, so its rho is dropped.
+        condition_cells = [
+            row for row in group[condition] if row["stability"] is not None
+        ]
+        degenerate_share = (
+            sum(1 for row in condition_cells if row["stability"] == 1.0)
+            / len(condition_cells)
+            if condition_cells
+            else None
+        )
+        degenerate = bool(degenerate_share is not None and degenerate_share > 0.8)
         values = [
             (mean_confidence[(row["claim_id"], condition)], row["stability"])
-            for row in group[condition]
-            if row["stability"] is not None
-            and (row["claim_id"], condition) in mean_confidence
+            for row in condition_cells
+            if (row["claim_id"], condition) in mean_confidence
         ]
-        correlation = spearman([a for a, _ in values], [b for _, b in values]) if values else None
+        correlation = (
+            None
+            if degenerate
+            else spearman([a for a, _ in values], [b for _, b in values])
+            if values
+            else None
+        )
         rows.append(
             {
                 "manipulation": condition,
                 "n_cells": len(values),
                 "spearman": correlation,
                 "degenerate_stability_share": degenerate_share,
-                "degenerate": bool(degenerate_share is not None and degenerate_share > 0.8),
+                "degenerate": degenerate,
             }
         )
     return rows
