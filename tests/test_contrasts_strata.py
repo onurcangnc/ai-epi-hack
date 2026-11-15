@@ -87,31 +87,89 @@ def by_contrast(rows):
 
 
 def test_bootstrap_known_effect():
+    """The pooled primary row is the one that carries inference.
+
+    Every high-confidence M1 sample is not_as_expected and every C0p sample is
+    as_expected, so the key-cell difference is the whole range: 1.0. The pooled
+    M1-minus-C0p row must report that effect with an interval and a p-value. The
+    per-class breakdown repeats the estimate but is exploratory, so it states no
+    p-value at all.
+    """
     rows = by_contrast(contrasts.run_contrasts(dataset(20), seed=7, n_resamples=2000))
-    row = rows[("M1_vs_C0p", "SUPPORT")]
-    assert row["estimate"] == pytest.approx(1.0)
-    assert row["method"] == "bootstrap"
-    assert row["n_claims"] == 20
-    assert row["ci_low"] == pytest.approx(1.0)
-    assert row["ci_high"] == pytest.approx(1.0)
-    assert row["p_value"] == 0.0
+
+    pooled = rows[("M1_vs_C0p", "pooled")]
+    assert pooled["estimate"] == pytest.approx(1.0)
+    assert pooled["n_claims"] == 20
+    assert pooled["method"] == "bootstrap"
+    assert pooled["ci_low"] == pytest.approx(1.0)
+    assert pooled["ci_high"] == pytest.approx(1.0)
+    assert pooled["p_value"] == 0.0
+
+    per_class = rows[("M1_vs_C0p", "SUPPORT")]
+    assert per_class["estimate"] == pytest.approx(1.0)
+    assert per_class["p_value"] is None
+    assert per_class["p_holm"] is None
 
 
-def test_cell_with_four_claims_uses_clopper_pearson():
+def test_cell_below_ten_contributing_claims_shows_counts_only():
+    """Too few contributing claims in either arm: counts and rates, nothing more.
+
+    Four claims is under the threshold on both sides, so the row still has to say
+    what was observed - 20 of 20 M1 samples not_as_expected against 0 of 20 C0p
+    samples, a rate difference of 1.0 - while offering no interval, no p-value and
+    none of the Clopper-Pearson fields an earlier SPEC asked for.
+    """
     rows = by_contrast(contrasts.run_contrasts(dataset(4), seed=7, n_resamples=200))
-    row = rows[("M1_vs_C0p", "SUPPORT")]
-    assert row["n_claims"] == 4
-    assert row["method"] == "clopper_pearson"
-    assert row["ci_low"] is None and row["ci_high"] is None
-    assert row["cp_low_manipulation"] > 0.5
-    assert row["cp_high_control"] < 0.5
+    for key in (("M1_vs_C0p", "pooled"), ("M1_vs_C0p", "SUPPORT")):
+        row = rows[key]
+        assert row["n_claims"] == 4, key
+        assert (row["not_as_expected_manipulation"], row["n_manipulation"]) == (20, 20), key
+        assert (row["not_as_expected_control"], row["n_control"]) == (0, 20), key
+        assert row["estimate"] == pytest.approx(1.0), key
+        assert row["method"] not in ("bootstrap", "clopper_pearson"), key
+        assert row["ci_low"] is None and row["ci_high"] is None, key
+        assert row["p_value"] is None and row["p_holm"] is None, key
+        assert [name for name in row if "cp_" in name or "clopper" in name] == [], key
+
+    # "EITHER arm": 12 contributing claims on the manipulation side do not buy an
+    # interval while the control side has only 4.
+    thin_control = dataset(12)
+    for row in thin_control:
+        if row["manipulation"] == "C0p" and int(row["claim_id"].lstrip("c")) >= 4:
+            row["model_verdict"] = None
+            row["as_expected"] = None
+            row["outcome_column"] = "no_verdict"
+    pooled = by_contrast(
+        contrasts.run_contrasts(thin_control, seed=7, n_resamples=200)
+    )[("M1_vs_C0p", "pooled")]
+    assert pooled["n_claims"] == 12
+    assert (pooled["n_manipulation"], pooled["n_control"]) == (60, 20)
+    assert pooled["estimate"] == pytest.approx(1.0)
+    assert pooled["method"] not in ("bootstrap", "clopper_pearson")
+    assert pooled["ci_low"] is None and pooled["ci_high"] is None
+    assert pooled["p_value"] is None
 
 
 def test_holm_only_for_the_two_primary_contrasts():
-    rows = by_contrast(contrasts.run_contrasts(dataset(12), seed=3, n_resamples=200))
-    assert rows[("M1_vs_C0p", "SUPPORT")]["p_holm"] is not None
-    assert rows[("M2_vs_C2", "SUPPORT")]["p_holm"] is not None
-    assert rows[("M2_vs_C0p", "SUPPORT")]["p_holm"] is None
+    """Holm covers exactly two p-values: the two pooled primary contrasts.
+
+    Nothing else in the table may carry a corrected p-value - not the secondary
+    M2-minus-C0p contrast, and not any per-class row of a primary contrast.
+    """
+    rows = contrasts.run_contrasts(dataset(12), seed=3, n_resamples=200)
+    keyed = by_contrast(rows)
+
+    corrected = {(row["contrast"], row["class"]) for row in rows if row["p_holm"] is not None}
+    assert corrected == {("M1_vs_C0p", "pooled"), ("M2_vs_C2", "pooled")}
+
+    secondary = keyed[("M2_vs_C0p", "SUPPORT")]
+    assert secondary["p_value"] is None
+    assert secondary["p_holm"] is None
+
+    for row in rows:
+        if row["class"] != "pooled":
+            assert row["p_value"] is None, (row["contrast"], row["class"])
+            assert row["p_holm"] is None, (row["contrast"], row["class"])
 
 
 def test_m1_strata_by_structured():
