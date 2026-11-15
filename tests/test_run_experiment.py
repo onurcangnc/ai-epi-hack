@@ -80,14 +80,23 @@ def small_units(count=4, condition="C0"):
 # Planning: counts, shards, ordering, naive restriction
 # --------------------------------------------------------------------------- #
 def test_dry_run_counts():
+    """A dry run states the size of the tier and the size of the slice it would run.
+
+    total_calls is the whole tier: 3500 core calls, 1250 extended, 1500 naive.
+    shard_calls is what this invocation would execute - the whole tier while no
+    order_seed defines an order, one shard of it once a seed does. Neither number
+    depends on the seed's value or on the naive prompt file being present; test_r20
+    in tests/test_review1_findings.py pins that independence directly.
+    """
     config = rx.load_config_for(CONFIG)
-    assert rx.dry_run(ROOT, CONFIG, "core")["total_calls"] == 3500
-    assert rx.dry_run(ROOT, CONFIG, "extended")["total_calls"] == 1250
-    naive = rx.dry_run(ROOT, CONFIG, "naive")
-    assert naive["total_calls"] == 1500
-    assert naive["missing_naive_prompt"] is True
-    assert naive["prompt_chars"] is None
-    assert config["run"]["order_seed"] is None
+    shards = config["run"]["shards"]
+    sharded = config["run"]["order_seed"] is not None
+
+    for tier, tier_calls in (("core", 3500), ("extended", 1250), ("naive", 1500)):
+        plan = rx.dry_run(ROOT, CONFIG, tier, f"1/{shards}")
+        assert plan["shard"] == f"1/{shards}", tier
+        assert plan["total_calls"] == tier_calls, tier
+        assert plan["shard_calls"] == (tier_calls // shards if sharded else tier_calls), tier
 
 
 def test_shards_partition_the_order():
