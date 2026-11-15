@@ -4,6 +4,30 @@ Changes to `SPEC.md` are recorded here with their reason, per SPEC §7. The §3/
 changes below were made before any experiment result existed; the TASK A2 entry
 above is the first result and records that ordering.
 
+## 2026-11-15 — Freeze preparation
+
+Freeze preparation for the main run; no main-run result exists. `run.order_seed` is set to
+`20261118` (the only config.yaml change). ANALYSIS.HASH now covers 22 files: config.yaml,
+scripts/run_experiment.py, the three analysis scripts added to its file list (run_analysis.py,
+common.py, make_flags.py), and every file under analysis/, src/ and prompts/. Figures are not
+included: matplotlib is unavailable in the project environment.
+
+- SPEC.md SHA-256: `18256ec0002974d20538526ec2f0aed233b4612414fe291ecf4342f87e475c70`
+- ANALYSIS.HASH SHA-256: `ba7dea27a20d9a4b59db86a5a280b47d0b567a0dc0a3584803edc1f82760888a`
+- prompts/verifier_system_naive.txt: absent, so no SHA-256 exists and the naive tier cannot run.
+- run.order_seed: 20261118
+- Tags at freeze preparation: analysis-v1, audit-sheets-v1, callayer-v2, callayer-v3, callayer-v4,
+  callayer-v5, conditions-v1, conditions-v1.1, conditions-v1.2, data-frozen, prompts-v1, review-1,
+  review1-fixed, runner-v1, spec-v1.1, spec-v1.2, spec-v1.3, spec-v1.3.1, spec-v1.3.2, spec-v1.3.3,
+  spec-v1.4, spec-v1.5.
+
+Several entries carry the date 2026-11-15. The guard (`latest_spec_hash`) reads the date on each
+`##` heading, keeps the newest date, and on a tie keeps the first entry in file order; this entry
+is first in the file, so the guard reads the SPEC SHA-256 below. Confirmed with
+`scripts/run_experiment.py --check-guards`: the SPEC.md guard reports PASS.
+
+SPEC SHA-256: `18256ec0002974d20538526ec2f0aed233b4612414fe291ecf4342f87e475c70`
+
 ## 2026-11-15 — SPEC v1.5: amendments after the final review; no main-run result exists
 
 Sections 5, 6, 7 and 8 amended after the review-1 findings, before any main-run result exists: the

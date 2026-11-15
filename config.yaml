@@ -67,7 +67,7 @@ run:
   conditions_core: [C0, C0p, C2, M1, M2]
   conditions_extended: [C1, C_closed]
   k: 5
-  order_seed: null
+  order_seed: 20261118
   tag_required: spec-frozen
   shards: 10
   # Logs live outside the repo and outside OneDrive (SPEC v1.5 §7): one log

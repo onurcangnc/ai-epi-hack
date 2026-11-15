@@ -372,12 +372,23 @@ def hash_files_match(root: Path) -> bool:
 
 ANALYSIS_HASH = "ANALYSIS.HASH"
 ANALYSIS_DIRS = ("analysis", "src", "prompts")
-ANALYSIS_FILES = ("config.yaml", "scripts/run_experiment.py")
+ANALYSIS_FILES = (
+    "config.yaml",
+    "scripts/run_experiment.py",
+    "scripts/run_analysis.py",
+    "scripts/common.py",
+    "scripts/make_flags.py",
+)
 
 
 def analysis_hash_targets(root: Path) -> list[str]:
-    """Every frozen analysis surface file (SPEC v1.5 §7)."""
-    targets = list(ANALYSIS_FILES)
+    """The frozen analysis surface that exists (SPEC v1.5 §7).
+
+    Fixed paths count only when present so a minimal frozen fixture still
+    passes; a listed file that disappears afterwards still fails
+    ``analysis_hash_matches`` through its ANALYSIS.HASH row.
+    """
+    targets = [relative for relative in ANALYSIS_FILES if (root / relative).is_file()]
     for directory in ANALYSIS_DIRS:
         for path in sorted((root / directory).rglob("*")):
             if path.is_file() and "__pycache__" not in path.parts:
