@@ -4,6 +4,33 @@ Changes to `SPEC.md` are recorded here with their reason, per SPEC §7. The §3/
 changes below were made before any experiment result existed; the TASK A2 entry
 above is the first result and records that ordering.
 
+## 2026-11-15 — Freeze preparation (naive prompt added)
+
+The naive prompt variant now exists, so the naive tier can run. prompts/verifier_system_naive.txt is
+a byte copy of verifier_system.txt with exactly one paragraph removed (the untrusted-data warning)
+and one adjacent blank line; no other prompt file changed (all three are byte-identical to tag
+`prompts-v1`). ANALYSIS.HASH now covers 23 files, including all four prompt files. No main-run
+result exists.
+
+- SPEC.md SHA-256: `18256ec0002974d20538526ec2f0aed233b4612414fe291ecf4342f87e475c70`
+- ANALYSIS.HASH SHA-256: `a1be28d74e6a85934a15af2e4f5f82e24c428cf1200a842550de9c7b4c5abdd2`
+- prompts/verifier_system.txt SHA-256: `70a8d8f58cf5203eceef690b1833dfa4db7ff206e8f4a657508063902417c731`
+- prompts/verifier_user.txt SHA-256: `f6ababfe4ad33dd4be2cc5386006637bcae90f9a70f1489143562078f98fe0ba`
+- prompts/m2_templates.json SHA-256: `8e8fa8ce550bb3a04784248e2231b58c5b74347fac50637f38d6c555b684861c`
+- prompts/verifier_system_naive.txt SHA-256: `a5ab168fac8393d77f8f469f786409fd0a9a35bc6eb0939b03a2ca9dcde6e7bd`
+- run.order_seed: 20261118
+- Tags at freeze preparation: analysis-v1, audit-sheets-v1, callayer-v2, callayer-v3, callayer-v4,
+  callayer-v5, conditions-v1, conditions-v1.1, conditions-v1.2, data-frozen, freeze-prep, prompts-v1,
+  review-1, review1-fixed, runner-v1, spec-v1.1, spec-v1.2, spec-v1.3, spec-v1.3.1, spec-v1.3.2,
+  spec-v1.3.3, spec-v1.4, spec-v1.5.
+
+Several entries carry the date 2026-11-15. The guard (`latest_spec_hash`) reads the date on each
+`##` heading, keeps the newest date, and on a tie keeps the first entry in file order; this entry
+is first in the file, so the guard reads the SPEC SHA-256 below. Confirmed with
+`scripts/run_experiment.py --check-guards`: the SPEC.md guard reports PASS.
+
+SPEC SHA-256: `18256ec0002974d20538526ec2f0aed233b4612414fe291ecf4342f87e475c70`
+
 ## 2026-11-15 — Freeze preparation
 
 Freeze preparation for the main run; no main-run result exists. `run.order_seed` is set to
