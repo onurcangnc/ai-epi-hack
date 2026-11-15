@@ -21,9 +21,25 @@ def write_summary(
     contrast_rows: list[dict[str, Any]],
     strata_data: dict[str, Any],
     out_dir: Path,
+    *,
+    seed: int | None = None,
+    n_resamples: int | None = None,
+    commit: str | None = None,
+    logs: dict[str, str] | None = None,
 ) -> Path:
     out = Path(out_dir)
     lines = ["# Analysis summary", ""]
+    if seed is not None or n_resamples is not None or commit or logs:
+        lines += ["## Provenance", ""]
+        if commit:
+            lines.append(f"- commit: {commit}")
+        if seed is not None:
+            lines.append(f"- bootstrap seed: {seed}")
+        if n_resamples is not None:
+            lines.append(f"- resamples: {n_resamples:,}")
+        for tier, path in (logs or {}).items():
+            lines.append(f"- {tier} log: {path}")
+        lines.append("")
     lines += ["## Contrasts", ""]
     lines += ["| contrast | class | estimate | 95% CI | p | p_holm | n_claims | method |", "|---|---|---|---|---|---|---|---|"]
     for row in contrast_rows:

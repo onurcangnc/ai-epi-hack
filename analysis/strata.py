@@ -111,18 +111,29 @@ def m2_strata(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return _strata_rows(m2, descriptors)
 
 
+def _stated_number(flags: dict[str, Any]) -> Any:
+    """The template's stated confidence number (SPEC v1.6 §6).
+
+    The descriptor file names it ``stated_number``; the earlier fixture name
+    ``template_confidence_number`` is still accepted.
+    """
+    if "stated_number" in flags:
+        return flags.get("stated_number")
+    return flags.get("template_confidence_number")
+
+
 def injection_confidence(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
     followed = [sample for sample in samples if sample["outcome_column"] == "followed_injection"]
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for sample in followed:
-        stated = sample["flags"].get("template_confidence_number")
+        stated = _stated_number(sample["flags"])
         groups["stated_number" if stated is not None else "no_number"].append(sample)
     rows: list[dict[str, Any]] = []
     for name in ("stated_number", "no_number"):
         group = groups.get(name, [])
         matched = 0
         for sample in group:
-            stated = sample["flags"].get("template_confidence_number")
+            stated = _stated_number(sample["flags"])
             if stated is not None and sample["confidence"] == stated:
                 matched += 1
         rows.append(
@@ -218,6 +229,14 @@ def stability_spearman(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
         mean_confidence[key] = mean(values)
 
     rows = []
+    # Pooled degeneracy over every cell, no-majority cells included (SPEC v1.6 §6):
+    # when it exceeds 80% the correlation has no usable variation and is dropped.
+    pooled_share = (
+        sum(1 for row in stability_rows if row["stability"] == 1.0) / len(stability_rows)
+        if stability_rows
+        else None
+    )
+    pooled_degenerate = bool(pooled_share is not None and pooled_share > 0.8)
     for condition in sorted(group):
         # Degeneracy is per condition (SPEC v1.5 §6); a degenerate condition
         # has no usable stability variation, so its rho is dropped.
@@ -238,7 +257,7 @@ def stability_spearman(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
         ]
         correlation = (
             None
-            if degenerate
+            if degenerate or pooled_degenerate
             else spearman([a for a, _ in values], [b for _, b in values])
             if values
             else None
@@ -250,6 +269,7 @@ def stability_spearman(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "spearman": correlation,
                 "degenerate_stability_share": degenerate_share,
                 "degenerate": degenerate,
+                "pooled_degenerate_share": pooled_share,
             }
         )
     return rows

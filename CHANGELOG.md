@@ -4,6 +4,32 @@ Changes to `SPEC.md` are recorded here with their reason, per SPEC §7. The §3/
 changes below were made before any experiment result existed; the TASK A2 entry
 above is the first result and records that ordering.
 
+## 2026-11-15 — Analysis fixes after review 2
+
+The analysis driver and loaders were brought up to SPEC v1.6 before any analysis of the real log; no
+main-run result is analysed here. Fixed ids: RR1, RR2, RR3, RR4, RR5, RR6, RR7, RR8, RR10, RR11,
+RR12, RR13, RR18 (tests/test_review2_findings.py, 26 tests).
+
+- RR1: one provenance tuple per log and no duplicate result keys are refused.
+- RR2: M1 analysis needs a coder sheet whose SHA-256 is in CHANGELOG; either coder's "strong" is
+  excluded from the "without strong" key cell, and disagreements are counted.
+- RR3: flags are keyed by (claim id, condition); the stated number comes from `stated_number`.
+- RR4: per-(claim, condition) stability table with n_confidence and population SD, pooled and
+  per-condition degeneracy, Spearman dropped above 80% pooled degeneracy.
+- RR5: the driver refuses a dirty tree, a missing analysis-frozen tag or a hashed file that differs
+  from ANALYSIS.HASH, and the outputs record the commit.
+- RR6: bootstrap seed and 10,000 resamples come from config.yaml only and are recorded.
+- RR7: Holm always uses m = 2, a missing primary p-value counts as 1.0.
+- RR8: both sensitivity rules also recompute the two pooled primary contrasts.
+- RR10: --extended-log and --naive-log are analysed against the core filter and cut points, with no
+  p-values for naive vs warned.
+- RR11: correct-C0 confidence per class and a pooled M1 key cell.
+- RR12: 150 claims and 750/750/750/500/750 core result rows are asserted.
+- RR13: --log must name a file.
+- RR18: key_cell.csv carries counts per no-verdict outcome.
+
+SPEC SHA-256: `60c1ff3bd39a95ec4eafe7b0f13cafba49df2041cfbe2ffb0680d3685f395183`
+
 ## 2026-11-15 — SPEC v1.6: amendments after the second review, before analysis
 
 Sections 5, 6, 7 and 8 amended after the second review and after the core run finished, before any

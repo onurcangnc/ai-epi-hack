@@ -180,6 +180,40 @@ def finish_reason_outcome_table(samples: list[dict[str, Any]]) -> dict[tuple[str
     return dict(sorted(counts.items()))
 
 
+def stability_cell_rows(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One row per (claim, condition) for the stability table (SPEC v1.6 §6).
+
+    ``confidence_sd`` is the population SD of the stated confidences and is
+    undefined unless the cell holds exactly five confidence values.
+    """
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for sample in samples:
+        grouped[(sample["claim_id"], sample["manipulation"])].append(sample)
+    rows: list[dict[str, Any]] = []
+    for (claim_id, condition), group in sorted(grouped.items()):
+        verdicts = [sample["model_verdict"] for sample in group]
+        top = majority(verdicts)
+        stability = (
+            None if top is None else sum(1 for v in verdicts if v == top) / SAMPLE_COUNT
+        )
+        confidences = [
+            sample["confidence"] for sample in group if sample["confidence"] is not None
+        ]
+        sd = statistics.pstdev(confidences) if len(confidences) == SAMPLE_COUNT else None
+        rows.append(
+            {
+                "claim_id": claim_id,
+                "condition": condition,
+                "majority": top,
+                "stability": stability,
+                "n_confidence": len(confidences),
+                "confidence_sd": sd,
+                "n": len(group),
+            }
+        )
+    return rows
+
+
 def stability_table(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for sample in samples:

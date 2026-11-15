@@ -141,14 +141,24 @@ def _bootstrap_delta(
 
 
 def _holm(primary_rows: list[dict[str, Any]]) -> None:
-    """Holm correction across exactly the two pooled primary p-values."""
-    p_values = [(row["p_value"], row) for row in primary_rows if row.get("p_value") is not None]
-    p_values.sort(key=lambda item: item[0])
-    m = len(p_values)
+    """Holm over exactly the two primary contrasts (SPEC v1.6 §6).
+
+    m is always 2: a missing or undefined primary p-value enters the step-down
+    procedure as 1.0, so the remaining contrast is never adjusted with m = 1.
+    """
+    m = 2
+    entries = [
+        (1.0 if row.get("p_value") is None else float(row["p_value"]), row)
+        for row in primary_rows
+    ]
+    entries.sort(key=lambda item: item[0])
     previous = 0.0
-    for index, (p_value, row) in enumerate(p_values):
+    for index, (p_value, row) in enumerate(entries):
         adjusted = min(1.0, max(previous, (m - index) * p_value))
-        row["p_holm"] = adjusted
+        # A row without a p-value takes part as 1.0 in the ordering but reports
+        # no adjusted p-value of its own.
+        if row.get("p_value") is not None:
+            row["p_holm"] = adjusted
         previous = adjusted
 
 
@@ -261,7 +271,13 @@ def run_contrasts(
     return rows
 
 
-def write_contrasts(rows: list[dict[str, Any]], out_dir: Path) -> Path:
+def write_contrasts(
+    rows: list[dict[str, Any]],
+    out_dir: Path,
+    *,
+    seed: int | None = None,
+    n_resamples: int | None = None,
+) -> Path:
     import csv
 
     out = Path(out_dir)
@@ -271,11 +287,14 @@ def write_contrasts(rows: list[dict[str, Any]], out_dir: Path) -> Path:
         "contrast", "class", "manipulation", "control", "n_claims",
         "n_manipulation", "not_as_expected_manipulation", "n_control",
         "not_as_expected_control", "estimate", "method", "ci_low", "ci_high",
-        "p_value", "p_holm",
+        "p_value", "p_holm", "seed", "n_resamples",
     ]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
         writer.writeheader()
         for row in rows:
-            writer.writerow({column: row.get(column) for column in columns})
+            record = {column: row.get(column) for column in columns}
+            record["seed"] = seed
+            record["n_resamples"] = f"{n_resamples:,}" if n_resamples is not None else None
+            writer.writerow(record)
     return path

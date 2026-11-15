@@ -20,6 +20,46 @@ from common import DataError, expected_verdict, read_jsonl  # noqa: E402
 
 CONDITIONS = ("C0", "C0p", "C1", "C2", "M1", "M2", "C_closed")
 NO_VERDICT_OUTCOMES = frozenset({"parse_failure", "blocked", "truncated", "api_error"})
+PROVENANCE_FIELDS = (
+    "config_hash",
+    "system_prompt_sha256",
+    "user_template_sha256",
+    "model",
+    "order_seed",
+)
+
+
+def read_log_rows(log_path: Path) -> list[dict[str, Any]]:
+    """Every row of one log; a directory is read inside that one directory only."""
+    path = Path(log_path)
+    paths = sorted(path.glob("*.jsonl")) if path.is_dir() else [path]
+    rows: list[dict[str, Any]] = []
+    for log in paths:
+        rows.extend(read_jsonl(log))
+    return rows
+
+
+def _validate_provenance(rows: list[dict[str, Any]], source: Path) -> None:
+    """One provenance tuple per log (SPEC v1.6 section 7).
+
+    Fields absent from a synthetic fixture log are left unchecked; a real log
+    carries all five and must not mix two void-and-restart attempts.
+    """
+    seen: dict[str, set[str]] = {}
+    for row in rows:
+        if not row.get("is_result"):
+            continue
+        for field in PROVENANCE_FIELDS:
+            if field in row and row[field] is not None:
+                seen.setdefault(field, set()).add(
+                    json.dumps(row[field], sort_keys=True)
+                )
+    for field, values in seen.items():
+        if len(values) > 1:
+            raise DataError(
+                f"{source} holds {len(values)} distinct {field} values; "
+                "a log must carry one provenance tuple"
+            )
 
 
 def first_result_rows(log_path: Path) -> list[dict[str, Any]]:
@@ -61,14 +101,23 @@ def load_conditions(conditions_dir: Path) -> dict[tuple[str, str], dict[str, Any
     return result
 
 
-def load_flags(path: Path | None) -> dict[str, dict[str, Any]]:
-    """Descriptor rows by claim id; a named but missing file is an error."""
+def load_flags(path: Path | None) -> dict[Any, dict[str, Any]]:
+    """Descriptor rows by (claim id, condition); a named but missing file is an error.
+
+    Descriptors belong to one (claim, condition) row (SPEC v1.6 §5), so the key
+    is the pair. A legacy row without a ``condition`` field is keyed by id so
+    older fixtures keep working; callers look up the pair first, then the id.
+    """
     if path is None:
         return {}
     path = Path(path)
     if not path.is_file():
         raise DataError(f"flags file not found: {path}")
-    return {row["id"]: row for row in read_jsonl(path)}
+    flags: dict[Any, dict[str, Any]] = {}
+    for row in read_jsonl(path):
+        condition = row.get("condition")
+        flags[(str(row["id"]), str(condition)) if condition is not None else str(row["id"])] = row
+    return flags
 
 
 def _majority(verdicts: list[str | None]) -> str | None:
@@ -110,6 +159,7 @@ def load_samples(
     flags_path: Path | None = None,
 ) -> list[dict[str, Any]]:
     """Load the long-table rows (bin is filled in later by cutpoints)."""
+    _validate_provenance(read_log_rows(raw_dir), Path(raw_dir))
     raw_rows = first_result_rows(raw_dir)
     gold = load_gold(gold_path)
     conditions = load_conditions(conditions_dir)
@@ -151,7 +201,9 @@ def load_samples(
                 "raw_response": row.get("raw_response"),
                 "manipulation_meta": meta,
                 "c0_majority": c0_majority.get(claim_id),
-                "flags": flags.get(claim_id, {}),
+                "flags": flags.get((claim_id, manipulation))
+                or flags.get(claim_id)
+                or {},
             }
         )
     return samples
