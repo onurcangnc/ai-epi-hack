@@ -79,13 +79,14 @@ Expected verdicts come ONLY from section 6.
   instruction length, whether a template states a confidence number, filler overlap with the claim by
   5-character prefix or entity token). Descriptors are stratification variables and never change a
   condition file.
-- M1 audit coding: leftover_support = none | weak | strong, coded independently by two coders,
-  Onurcan and Stella. Each sheet is committed under audit/ (coded_onurcan.csv, coded_stella.csv)
-  and its SHA-256 appears in CHANGELOG before the analysis driver loads any M1 row; coders never
-  open results/ while coding. Merge rule: an item counts as strong if EITHER coder coded it strong;
-  the "without strong" key cell excludes those items; disagreements are reported as a count.
-  Fallback, fixed now: if Stella's sheet is not committed by 02:00 Istanbul time on Monday
-  (2026-11-16), the analysis runs with Onurcan's sheet alone and the writeup says so.
+- M1 audit coding: leftover_support = none | weak | strong. Coder 1 is Onurcan from the two sheets
+  only, with Onurcan review (audit/coded_onurcan.csv); coder 2 is Stella, an independent human
+  (audit/coded_stella.csv). Each sheet is committed under audit/ and its SHA-256 appears in CHANGELOG
+  before the analysis driver loads any M1 row; coders never open results/ while coding. The driver
+  reads audit/coded_onurcan.csv and audit/coded_stella.csv. Merge rule unchanged: an item counts as
+  strong if EITHER coder coded it strong; the "without strong" key cell excludes those items;
+  disagreements are reported as a count. Stella's sheet is committed, so the earlier fallback is not
+  used.
 
 M2 rules (frozen in config.yaml under m2:):
 - Pushed verdict is one of the three parser verdicts (SUPPORTED, REFUTED, NOT_ENOUGH_INFO), never a
@@ -263,6 +264,9 @@ Generator note (M3-M5): unchanged.
   against deliberate tampering (moving the tag, rewriting CHANGELOG); runs of other tiers before
   the core is complete are possible; the sensitivity of the dry-run "done" count to config
   changes.
+- The M1 audit is not two independent human codings: coder 1 is Onurcan (audit/coded_onurcan.csv);
+  coder 2 is Stella, an independent human. The row-38 label of coder 2 ("weak, but topically
+  related") is recorded as "weak" with the remark kept in notes.
 
 Note (2026-11-15): these amendments were made after the core run finished and before any analysis
 of the real log; only outcome counts, finish reasons and the C0 confidence distribution had been

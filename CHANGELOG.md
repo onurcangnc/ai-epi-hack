@@ -4,6 +4,31 @@ Changes to `SPEC.md` are recorded here with their reason, per SPEC §7. The §3/
 changes below were made before any experiment result existed; the TASK A2 entry
 above is the first result and records that ordering.
 
+## 2026-11-15 — Audit sheets committed
+
+Coder 1 is Onurcan from the two sheets only, with Onurcan review (audit/coded_onurcan.csv,
+audit/coded_onurcan_filler.csv); coder 2 is Stella, an independent human (audit/coded_stella.csv,
+audit/coded_stella_filler.csv). The driver reads audit/coded_onurcan.csv and
+audit/coded_stella.csv.
+
+- SPEC.md SHA-256: `62466513511f99d8dcd3279df094db1e411b51f576d6d5ba0503b80d10beb5d4`
+- audit/c_filler_audit.csv SHA-256: `ef617ffe38ab6a1cf7f0931e9474b62b807306f9e0bae498a22b42f617e3b831`
+- audit/c_filler_audit.md SHA-256: `973263e6598c6149e73f433e98eba59b4ab603c37c09e9e1ffcb02a92aa898c4`
+- audit/coded_onurcan_filler.csv SHA-256: `6346fcfc5a3bf241ba9704516dcf675d071db82276857828ff0e9fe3c7b0a219`
+- audit/coded_onurcan.csv SHA-256: `02d00cf6355546ca6e37a6e38bbe0d6301da08ad295099b0648f2676efd81fda`
+- audit/coded_stella.csv SHA-256: `eb995d186590d4d1b26e6e17177006645da943dda1a578d38bc9ab8f416ec59e`
+- audit/coded_stella_filler.csv SHA-256: `61f622d0a5a38c88ae069c4f50c7cc66fd8834fdaeab3e7dfda00a6fb5f5e38b`
+- audit/coded_template.csv SHA-256: `7bdf126ecab095181ad00ed64556d699e810359b172b8334bb3e5abd49a1479b`
+- audit/key.csv SHA-256: `399c01d15341f35ae25fd4647fcc37f25aec9eb944653080271ff07b52abe66b`
+- audit/m1_audit.csv SHA-256: `3cbff2d1989bc510c865eb2ed36d1d8966b5c8778201fc3302adccc58e4a6230`
+- audit/m1_audit.md SHA-256: `c16202184c78e073ed7cc24ca7073c40eb189dea0f0fac002af292f57f0cdfc7`
+- audit/README.md SHA-256: `df70b9e5ecb39afa5d6ffb49671e3aff669b07286f3c8f0920f111aedc5e76c6`
+- Stella's received m1_audit.md SHA-256: `baf5ad1f29531ebf2e1b3bdf62c95d4120cc46766ebcae0d8acfd440b84ae85b`
+
+Stella's sheets were committed exactly as received apart from the row-38 normalization: her
+"weak, but topically related" label is recorded as "weak" and the remark is kept in the notes.
+
+SPEC SHA-256: `62466513511f99d8dcd3279df094db1e411b51f576d6d5ba0503b80d10beb5d4`
 ## 2026-11-15 — Analysis fixes after review 2
 
 The analysis driver and loaders were brought up to SPEC v1.6 before any analysis of the real log; no

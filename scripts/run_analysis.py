@@ -381,8 +381,18 @@ def naive_rows(
     return key_rows, rate_rows
 
 
+M1_SHEETS = ("coded_onurcan.csv", "coded_stella.csv")
+
+
 def coder_sheets(root: Path) -> dict[str, Path]:
-    """Coder sheets under audit/ whose SHA-256 appears in CHANGELOG (SPEC v1.6 §5)."""
+    """Coder sheets under audit/ whose SHA-256 appears in CHANGELOG (SPEC v1.6 §5).
+
+    The audit names coder 1's and coder 2's M1 sheets (``M1_SHEETS``); when both
+    are present only those are read, so the C1/C2 filler sheets can never be
+    mistaken for M1 codings. A fixture tree with other recorded sheet names
+    (``coded_onurcan.csv`` etc.) falls back to every recorded ``coded_*.csv``
+    except the template and the filler sheets.
+    """
     audit = Path(root) / "audit"
     changelog_path = Path(root) / "CHANGELOG.md"
     changelog = (
@@ -390,14 +400,22 @@ def coder_sheets(root: Path) -> dict[str, Path]:
         if changelog_path.is_file()
         else ""
     )
+    if not audit.is_dir():
+        return {}
+    preferred = [audit / name for name in M1_SHEETS]
+    if all(path.is_file() for path in preferred):
+        candidates = preferred
+    else:
+        candidates = [
+            path
+            for path in sorted(audit.glob("coded_*.csv"))
+            if path.name != "coded_template.csv" and "filler" not in path.name
+        ]
     sheets: dict[str, Path] = {}
-    if audit.is_dir():
-        for path in sorted(audit.glob("coded_*.csv")):
-            if path.name == "coded_template.csv":
-                continue
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
-            if digest in changelog:
-                sheets[path.stem[len("coded_"):]] = path
+    for path in candidates:
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest in changelog:
+            sheets[path.stem[len("coded_"):]] = path
     return sheets
 
 
