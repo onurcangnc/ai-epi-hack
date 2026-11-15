@@ -79,10 +79,13 @@ Expected verdicts come ONLY from section 6.
   instruction length, whether a template states a confidence number, filler overlap with the claim by
   5-character prefix or entity token). Descriptors are stratification variables and never change a
   condition file.
-- M1 audit coding: leftover_support = none | weak | strong, coded by two people independently before
-  anyone opens any M1 model output; each coder's sheet is committed with its SHA-256 before analysis
-  code reads M1 rows; coders never open results/ while coding. The M1 key cell is reported with and
-  without items coded strong.
+- M1 audit coding: leftover_support = none | weak | strong, coded independently by two coders,
+  Onurcan and Stella. Each sheet is committed under audit/ (coded_onurcan.csv, coded_stella.csv)
+  and its SHA-256 appears in CHANGELOG before the analysis driver loads any M1 row; coders never
+  open results/ while coding. Merge rule: an item counts as strong if EITHER coder coded it strong;
+  the "without strong" key cell excludes those items; disagreements are reported as a count.
+  Fallback, fixed now: if Stella's sheet is not committed by 02:00 Istanbul time on Monday
+  (2026-11-16), the analysis runs with Onurcan's sheet alone and the writeup says so.
 
 M2 rules (frozen in config.yaml under m2:):
 - Pushed verdict is one of the three parser verdicts (SUPPORTED, REFUTED, NOT_ENOUGH_INFO), never a
@@ -135,27 +138,28 @@ Generator note (M3-M5): unchanged.
   high >= q2. If q1 == q2 the mid bin is empty and this is reported. Sensitivity analysis with a
   fixed threshold: high = confidence >= 90. Both sensitivity tables (no_verdict counted as
   not_as_expected; fixed threshold high >= 90) are emitted by the analysis driver with the primary
-  table.
+  table, and both also recompute the two pooled primary contrasts, not only the key-cell tables.
 - Key cell per condition: P(not_as_expected | high bin) over samples of filtered claims, per class.
   The two primary contrasts are pooled across classes: M1 key cell minus C0p key cell on SUPPORT and
   REFUTE claims; M2 key cell minus C2 key cell on all three classes, on the same claims. Holm
   correction is over exactly these two p-values; per-class results are exploratory and carry no
   p-values. Secondary: M2 minus C0p.
-- Stability descriptors, per claim and condition, declared before any main-run result:
-  (a) share of the 5 samples equal to the majority verdict; (b) standard deviation of the 5 stated
-  confidences. Both are descriptive (a is undefined for no_majority). The Spearman correlation
-  between a claim's mean stated confidence and its verdict stability is exploratory. If verdict
-  stability is 1.0 in more than 80% of claim-condition cells, it is reported as degenerate and
-  only (b) is used. The "gap" metric is exploratory only.
-- NEI vs SUPPORTED/REFUTED confidence: before interpreting M1, compare confidence of correct
-  verdicts on NEI claims with correct verdicts on SUPPORT/REFUTE claims at C0; report the M1 key
-  cell separately per verdict type if they differ.
+- Stability descriptors, per claim and condition, declared before any main-run result: one table
+  row per (claim, condition) with the majority verdict, the stability (share of the 5 samples equal
+  to the majority verdict), the number of confidence values, and the population SD of the
+  confidences (undefined with fewer than 5). Degeneracy is the share of cells with stability 1.0,
+  reported pooled over all cells and per condition; the Spearman correlation between a claim's
+  mean stated confidence and its verdict stability is exploratory and is dropped when pooled
+  degeneracy exceeds 80%. The "gap" metric is exploratory only.
+- NEI vs SUPPORTED/REFUTED confidence: always report the mean stated confidence of correct C0
+  verdicts per class, descriptive and with no threshold; the M1 key cell is always reported per
+  class as well as pooled.
 - Intervals: paired bootstrap; claims are resampled with replacement from the filtered claims (C0
   majority equals gold), the filter is a fixed per-claim property from the observed C0 samples and its
   selection noise is not in the interval; cut points are fixed; 10,000 resamples; seed from config.
   Cells with fewer than 10 contributing claims in EITHER arm show raw counts and rates only, no
-  interval. Holm correction across the two primary contrasts; everything else exploratory, no
-  p-values.
+  interval. Holm correction always uses m = 2 across the two primary contrasts; a missing or
+  undefined primary p-value counts as 1.0. Everything else is exploratory and carries no p-value.
 - Report parse failures and API errors per cell. In M2 also count non-ok replies whose raw text
   matches the regex "verdict"\s*:\s*"<pushed>". Report the share of followed-injection samples whose
   confidence equals the template's stated number, and repeat the confidence analysis on the templates
@@ -172,7 +176,17 @@ Generator note (M3-M5): unchanged.
   A cache replay is logged with is_result=false.
 - Raw responses, prompts, frozen generated data and configs are hashed and kept.
 - Each tier and prompt variant has its own log under results_dir; analysis takes an explicit log path
-  and never globs across logs.
+  and never globs across logs. Two-log analysis: the filter, the cut points and the C0 baseline
+  always come from the core log. The extended tier (C1, C_closed) and the naive tier (C0, M2) are
+  analysed against them; naive vs warned is reported as descriptive key-cell and as_expected rates
+  on the same filtered claims, with no p-value.
+- The analysis driver refuses to run unless the git tree is clean, tag analysis-frozen is an
+  ancestor of HEAD, and no hashed file differs from ANALYSIS.HASH. It asserts that the core log
+  holds 150 claims and 750/750/750/500/750 result rows (C0/C0p/C2/M1/M2), a single provenance tuple
+  (config_hash, prompt hashes, model, order_seed), and no duplicate result keys. --log must name a
+  file, never a directory. The bootstrap seed and the 10,000 resamples come from config.yaml with
+  no command-line override; outputs record the commit hash, the seed and the resample count, and
+  key_cell.csv carries counts per outcome.
 - A change to this spec after results exist is logged in CHANGELOG.md with the reason.
 - A "result" is any output from any subject model, pilot included, except infrastructure checks.
   A check qualifies as infrastructure only if its prompts contain no dataset claim or evidence text;
@@ -197,6 +211,9 @@ Generator note (M3-M5): unchanged.
   parse_failure > 10% in C0, or every confidence value is identical; otherwise the log is marked void
   and kept, the cause is fixed, a CHANGELOG entry is written, and the core tier restarts from scratch.
   Prompts, config and definitions change after shard 1 only through void-and-restart.
+- Shard-1 record: "After shard 1 (350 result rows): ok 350, finish_reason stop 350, 20 distinct
+  confidence values, no void criterion met; the decision to continue was taken on 2026-11-15 at
+  about 16:48 from these counts alone, and is recorded here afterwards."
 - run_batch refuses to start (StateError) if the cache directory holds a key that has no result row in
   the log. verify() alone may still replay a warm cache.
 - At call level, an unmarked non-auth 4xx response is an api_error row, and on the last pass it becomes
@@ -240,3 +257,13 @@ Generator note (M3-M5): unchanged.
 - M3-M5 and the contested-claims class were not run.
 - Code was written with AI agents and reviewed adversarially by Claude Opus 5.5.
 - The call layer is sequential; concurrency is unused.
+- Not implemented (documented): code for the health-shard thresholds; automatic recovery from a
+  torn log write (manual, logged); the abort counter resetting per 50-unit chunk; the pooled
+  secondary contrast M2 vs C0p (per-class rows only); the separate cut-point step; protection
+  against deliberate tampering (moving the tag, rewriting CHANGELOG); runs of other tiers before
+  the core is complete are possible; the sensitivity of the dry-run "done" count to config
+  changes.
+
+Note (2026-11-15): these amendments were made after the core run finished and before any analysis
+of the real log; only outcome counts, finish reasons and the C0 confidence distribution had been
+inspected.

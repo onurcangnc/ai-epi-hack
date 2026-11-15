@@ -4,6 +4,25 @@ Changes to `SPEC.md` are recorded here with their reason, per SPEC §7. The §3/
 changes below were made before any experiment result existed; the TASK A2 entry
 above is the first result and records that ordering.
 
+## 2026-11-15 — SPEC v1.6: amendments after the second review, before analysis
+
+Sections 5, 6, 7 and 8 amended after the second review and after the core run finished, before any
+analysis of the real log. Section 5: the M1 audit names the two coders (Onurcan, Stella), their
+sheets (audit/coded_onurcan.csv, audit/coded_stella.csv), the either-coder merge rule, the
+disagreement count and the fixed Stella fallback. Section 6: the per-(claim, condition) stability
+table with the number of confidence values and pooled plus per-condition degeneracy; Holm always
+with m = 2 and a missing primary p-value counted as 1.0; both sensitivity rules also recompute the
+two pooled primary contrasts; the NEI-vs-directional confidence comparison is always reported and
+the M1 key cell always per class as well as pooled; two-log analysis with the core log as the
+source of the filter, the cut points and the C0 baseline. Section 7: the analysis-driver
+preconditions (clean tree, analysis-frozen ancestor, ANALYSIS.HASH agreement, core-log shape,
+unique provenance tuple, no duplicate keys, --log a file, config-only seed and resample count,
+provenance recorded in the outputs, key_cell.csv counts per outcome) and the recorded shard-1
+health counts. Section 8: eight documented non-implementations and a note that the amendments
+were made after the core run and before any analysis of the real log.
+
+SPEC SHA-256: `60c1ff3bd39a95ec4eafe7b0f13cafba49df2041cfbe2ffb0680d3685f395183`
+
 ## 2026-11-15 — Freeze preparation (naive prompt added)
 
 The naive prompt variant now exists, so the naive tier can run. prompts/verifier_system_naive.txt is
