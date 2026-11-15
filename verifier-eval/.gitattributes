@@ -1,0 +1,3 @@
+# Keep every file byte-for-byte. The frozen data/prompt hashes depend on
+# exact bytes, so git must not normalise line endings on checkout.
+* -text

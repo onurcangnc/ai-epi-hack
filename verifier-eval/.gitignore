@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+data/raw/
+.pytest_cache/
+# pytest tmp dirs land in the project root because the sandbox denies the
+# system temp dir (tempfile falls back to cwd).
+pytest-of-*/
+build_subset_*/
+# persistent response cache (cache.dir); reproducible, never committed
+cache/
+# never commit credentials
+.env
