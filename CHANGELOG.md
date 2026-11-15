@@ -4,6 +4,23 @@ Changes to `SPEC.md` are recorded here with their reason, per SPEC §7. The §3/
 changes below were made before any experiment result existed; the TASK A2 entry
 above is the first result and records that ordering.
 
+## 2026-11-15 — SPEC v1.5: amendments after the final review; no main-run result exists
+
+Sections 5, 6, 7 and 8 amended after the review-1 findings, before any main-run result exists: the
+M1 audit rule (audit sheets committed before any M1 output is opened), the health shard (1/10) of
+the core tier and its void-and-restart rule, order_seed/results_dir/cache fixed in config.yaml
+before the freeze, Clopper-Pearson replaced by raw counts and rates only for cells with fewer than
+10 contributing claims in either arm, the two primary contrasts pooled across classes with Holm
+over exactly those two p-values (per-class results exploratory, no p-values), the fixed-filter
+paired bootstrap whose interval excludes the C0 selection noise, the unmarked-4xx result-row rule
+and the five-result-rows-per-cell assertion, one log per tier and prompt variant, both sensitivity
+tables emitted with the primary table, exactly-five-row requirements for majority/stability/
+confidence SD, the filter accounting identity, ANALYSIS.HASH for the frozen analysis surface and
+the 1800 s cumulative sleep cap, C2's word count within +-2 of the M2 instruction, and two new
+limitations.
+
+SPEC SHA-256: `18256ec0002974d20538526ec2f0aed233b4612414fe291ecf4342f87e475c70`
+
 ## 2026-11-15 — SPEC v1.4: amendments after the conditions review; no main-run result exists
 
 Sections 1, 5, 6, 7 and 8 amended: two primary contrasts (M1 - C0p, M2 - C2), core/extended tiers,
