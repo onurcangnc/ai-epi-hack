@@ -43,6 +43,8 @@ def write_summary(
             f"| {row['descriptor']} | {row['value']} | {row['claims']} | {row['samples']} | "
             f"{row['not_as_expected']} | {_fmt(row['rate'])} |"
         )
+    if strata_data.get("audit_available") is False:
+        lines += ["", "_M1 audit stratum omitted: audit/coded.csv is missing._"]
     lines += ["", "## M2 strata", ""]
     lines += ["| descriptor | value | claims | samples | not_as_expected | rate |", "|---|---|---|---|---|---|"]
     for row in strata_data.get("m2", []):

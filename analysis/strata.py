@@ -28,14 +28,21 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
-def audit_codes(audit_dir: Path | None) -> dict[str, str]:
-    """id -> leftover_support, when audit/coded.csv exists."""
+def audit_codes(audit_dir: Path | None) -> dict[str, str] | None:
+    """id -> leftover_support, or None when audit/coded.csv is missing.
+
+    None means the M1 audit stratum cannot be produced. Callers omit it and say
+    so; an uncoded audit must never look like a coded stratum with no rows.
+    """
     if audit_dir is None:
-        return {}
+        return None
+    coded_path = Path(audit_dir) / "coded.csv"
+    if not coded_path.is_file():
+        return None
     key_rows = _read_csv(Path(audit_dir) / "key.csv")
-    coded_rows = _read_csv(Path(audit_dir) / "coded.csv")
+    coded_rows = _read_csv(coded_path)
     if not key_rows or not coded_rows:
-        return {}
+        return None
     id_by_row = {
         row["row"]: row["id"]
         for row in key_rows
@@ -84,7 +91,8 @@ def m1_strata(samples: list[dict[str, Any]], audit_dir: Path | None = None) -> l
     descriptors: dict[str, Any] = {
         key: (lambda sample, key=key: sample["flags"].get(key)) for key in M1_KEYS
     }
-    descriptors["audit_leftover_support"] = lambda sample: codes.get(sample["claim_id"])
+    if codes is not None:
+        descriptors["audit_leftover_support"] = lambda sample: codes.get(sample["claim_id"])
     return _strata_rows(m1, descriptors)
 
 
@@ -279,4 +287,5 @@ def write_strata(
     return {
         "m1": m1, "m2": m2, "injection": injection, "numberless": numberless,
         "pushed": pushed, "spearman": spearman_rows,
+        "audit_available": audit_codes(audit_dir) is not None,
     }

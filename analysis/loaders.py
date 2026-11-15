@@ -62,8 +62,12 @@ def load_conditions(conditions_dir: Path) -> dict[tuple[str, str], dict[str, Any
 
 
 def load_flags(path: Path | None) -> dict[str, dict[str, Any]]:
-    if path is None or not Path(path).is_file():
+    """Descriptor rows by claim id; a named but missing file is an error."""
+    if path is None:
         return {}
+    path = Path(path)
+    if not path.is_file():
+        raise DataError(f"flags file not found: {path}")
     return {row["id"]: row for row in read_jsonl(path)}
 
 

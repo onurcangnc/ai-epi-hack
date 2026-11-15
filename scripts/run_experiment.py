@@ -337,23 +337,12 @@ def read_hash_file(path: Path) -> list[tuple[str, str]]:
     return rows
 
 
-# Files the build scripts write beside the frozen data: documentation and
-# derived sidecars that SPEC v1.5 §7 does not freeze. The manifest must cover
-# every other file in its own directory, so deleting rows cannot pass.
-NOT_FROZEN_DATA = frozenset(
-    {
-        "HASHES.txt",
-        "DATA_REPORT.md",
-        "README.md",
-        "conditions_meta.json",
-        "skips.jsonl",
-        "m1_overlap_screen.jsonl",
-    }
-)
-
-
 def hash_file_matches(root: Path, path: Path) -> bool:
-    """Every listed file must match, and the list must cover its directory."""
+    """Every listed file must match, and the list must cover its directory.
+
+    The manifest covers every file beside it except itself, so deleting a row
+    (or adding a file the manifest does not name) fails the guard.
+    """
     if not path.is_file():
         return False
     rows = read_hash_file(path)
@@ -370,7 +359,7 @@ def hash_file_matches(root: Path, path: Path) -> bool:
     siblings = {
         child.name
         for child in path.parent.iterdir()
-        if child.is_file() and child.name not in NOT_FROZEN_DATA
+        if child.is_file() and child.name != path.name
     }
     return covered == siblings
 
